@@ -1,7 +1,7 @@
 /**
  * 다이제스트 마크다운을 노션 블록으로 변환한다.
- * - ## 섹션(축) → 토글
- * - ### 기사 → 토글 (제목만 보이게)
+ * - ## 섹션(축) → 토글 (날짜 토글 안 1단)
+ * - ### 기사 → heading_3 + 문단/콜아웃 (토글 중첩 제한 회피)
  * - **요약** / **분석** / **출처** → 문단·콜아웃
  */
 
@@ -140,20 +140,19 @@ function labeledLineToBlock(text: string): NotionBlock {
   return paragraph(trimmed);
 }
 
-/** ### 기사 → 토글, 내부는 요약/분석/출처 블록 */
-function newsItemToToggle(title: string, lines: MdLine[]): NotionBlock {
-  const children: NotionBlock[] = [];
+/** ### 기사 → heading_3 + 요약/분석/출처 (Notion은 토글 2단까지만 허용) */
+function newsItemToBlocks(title: string, lines: MdLine[]): NotionBlock[] {
+  const cleanTitle = title.replace(/^\[|\]$/g, '').replace(/\*\*/g, '');
+  const blocks: NotionBlock[] = [heading3(cleanTitle)];
+
   for (const line of lines) {
-    if (line.kind === 'paragraph') {
-      children.push(labeledLineToBlock(line.text));
-    } else if (line.kind === 'bullet') {
-      children.push(labeledLineToBlock(line.text));
+    if (line.kind === 'paragraph' || line.kind === 'bullet') {
+      blocks.push(labeledLineToBlock(line.text));
     } else {
-      children.push(...linesToBlocks([line]));
+      blocks.push(...linesToBlocks([line]));
     }
   }
-  const cleanTitle = title.replace(/^\[|\]$/g, '').replace(/\*\*/g, '');
-  return toggle(cleanTitle, children);
+  return blocks;
 }
 
 function toggle(title: string, children: NotionBlock[]): NotionBlock {
@@ -167,7 +166,7 @@ function toggle(title: string, children: NotionBlock[]): NotionBlock {
   };
 }
 
-/** 섹션 본문: ### 기사 토글 + 나머지 */
+/** 섹션 본문: ### 기사 블록 + 나머지 */
 function sectionLinesToBlocks(lines: MdLine[]): NotionBlock[] {
   const blocks: NotionBlock[] = [];
   let i = 0;
@@ -181,7 +180,7 @@ function sectionLinesToBlocks(lines: MdLine[]): NotionBlock[] {
         bodyLines.push(lines[i]);
         i++;
       }
-      blocks.push(newsItemToToggle(title, bodyLines));
+      blocks.push(...newsItemToBlocks(title, bodyLines));
       continue;
     }
 

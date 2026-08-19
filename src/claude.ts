@@ -45,7 +45,7 @@ async function runAgent(prompt: string, opts: AgentRunOptions): Promise<string> 
 export async function generateWithSearch(prompt: string): Promise<string> {
   warnIfAuthConflict();
   console.log(`🤖 모델: ${config.model}`);
-  console.log('🔎 Agent SDK — 웹 검색으로 수집 중... (1~3분 소요)');
+  console.log('🔎 Agent SDK — 웹 검색으로 수집 중... (5~10분 소요)');
 
   const text = await runAgent(prompt, { webSearch: true });
   console.log(`✅ 수집 완료 (${text.length}자)`);

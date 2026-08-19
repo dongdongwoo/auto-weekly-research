@@ -1,6 +1,6 @@
 # auto-weekly-research
 
-매일 KST 08:00 — 전날 뉴스 수집 → Notion (월~일). **월요일** — 지난주 마감(일요일 일일) → 주간 인사이트 → **이번 주 페이지 생성** (화요일부터 일일 등록).
+매일 KST 07:30 — 전날 뉴스 수집 → Notion (월~일). **월요일** — 지난주 마감(일요일 일일) → 주간 인사이트 → **이번 주 페이지 생성** (화요일부터 일일 등록).
 
 **데이터는 Notion만 사용** — 로컬 `data/` 파일·git pull 불필요. 중복 제거·주간 인사이트 모두 Notion에서 읽습니다.
 
@@ -18,7 +18,7 @@ npm run morning        # 일일 (+ 월요일 주간)
 | `npm run collect` | 일일만 (수동)    |
 | `npm run weekly`  | 주간만 (수동)    |
 
-## 스케줄 (KST 08:00, GitHub Actions = `npm run morning`)
+## 스케줄 (KST 07:30, GitHub Actions = `npm run morning`)
 
 | 요일 | 실행 내용 |
 | ---- | --------- |
@@ -42,7 +42,7 @@ Integration을 허브 페이지에 연결해야 함.
 
 ## 자동 실행
 
-**GitHub Actions** — push + Secrets 3개 (`CLAUDE_CODE_OAUTH_TOKEN`, `NOTION_API_KEY`, `NOTION_PAGE_ID`). 매일 KST 08:00.
+**GitHub Actions** — push + Secrets 3개 (`CLAUDE_CODE_OAUTH_TOKEN`, `NOTION_API_KEY`, `NOTION_PAGE_ID`). 매일 KST 07:30.
 
 ## 파일 구조
 
