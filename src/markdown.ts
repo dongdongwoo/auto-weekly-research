@@ -1,7 +1,8 @@
 /**
  * 다이제스트 마크다운을 노션 블록으로 변환한다.
- * 지원: ## / ### 헤딩, - 불릿, **볼드**, [텍스트](URL) 링크, 일반 문단.
- * 노션 제약: rich_text 1개당 2000자 제한 → 초과 시 분할.
+ * - ## 섹션 → 토글 (축별 한눈에 보기)
+ * - 들여쓰기 불릿 → 중첩 bulleted_list_item
+ * - **볼드**, [텍스트](URL) rich_text
  */
 
 type RichText = {
@@ -14,10 +15,15 @@ export type NotionBlock = Record<string, unknown>;
 
 const MAX_TEXT = 2000;
 
+type MdLine = {
+  kind: 'h2' | 'h3' | 'bullet' | 'numbered' | 'paragraph';
+  text: string;
+  indent: number;
+};
+
 /** **볼드**와 [텍스트](URL)를 노션 rich_text 배열로 토크나이즈 */
 export function toRichText(line: string): RichText[] {
   const out: RichText[] = [];
-  // 링크와 볼드를 함께 잡는 토크나이저
   const pattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*/g;
   let last = 0;
   let m: RegExpExecArray | null;
@@ -32,10 +38,8 @@ export function toRichText(line: string): RichText[] {
   while ((m = pattern.exec(line)) !== null) {
     if (m.index > last) pushPlain(line.slice(last, m.index));
     if (m[1] && m[2]) {
-      // 마크다운 링크
       out.push({ type: 'text', text: { content: m[1].slice(0, MAX_TEXT), link: { url: m[2] } } });
     } else if (m[3]) {
-      // 볼드
       out.push({ type: 'text', text: { content: m[3].slice(0, MAX_TEXT) }, annotations: { bold: true } });
     }
     last = m.index + m[0].length;
@@ -44,33 +48,204 @@ export function toRichText(line: string): RichText[] {
   return out.length ? out : [{ type: 'text', text: { content: '' } }];
 }
 
-export function markdownToBlocks(md: string): NotionBlock[] {
-  const blocks: NotionBlock[] = [];
-  for (const raw of md.split('\n')) {
-    const line = raw.trimEnd();
-    if (!line.trim()) continue;
+function parseLine(raw: string): MdLine | null {
+  const line = raw.trimEnd();
+  if (!line.trim()) return null;
 
-    if (line.startsWith('### ')) {
-      blocks.push({ object: 'block', type: 'heading_3', heading_3: { rich_text: toRichText(line.slice(4)) } });
-    } else if (line.startsWith('## ')) {
-      blocks.push({ object: 'block', type: 'heading_2', heading_2: { rich_text: toRichText(line.slice(3)) } });
-    } else if (line.startsWith('# ')) {
-      blocks.push({ object: 'block', type: 'heading_2', heading_2: { rich_text: toRichText(line.slice(2)) } });
-    } else if (/^[-*] /.test(line)) {
-      blocks.push({
-        object: 'block',
-        type: 'bulleted_list_item',
-        bulleted_list_item: { rich_text: toRichText(line.replace(/^[-*] /, '')) },
-      });
-    } else if (/^\d+\. /.test(line)) {
-      blocks.push({
-        object: 'block',
-        type: 'numbered_list_item',
-        numbered_list_item: { rich_text: toRichText(line.replace(/^\d+\. /, '')) },
-      });
+  const indent = raw.match(/^\s*/)?.[0].length ?? 0;
+
+  if (/^## /.test(line.trim())) {
+    return { kind: 'h2', text: line.trim().slice(3), indent: 0 };
+  }
+  if (/^### /.test(line.trim())) {
+    return { kind: 'h3', text: line.trim().slice(4), indent: 0 };
+  }
+  if (/^[-*] /.test(line.trim())) {
+    return { kind: 'bullet', text: line.trim().replace(/^[-*] /, ''), indent };
+  }
+  if (/^\d+\. /.test(line.trim())) {
+    return { kind: 'numbered', text: line.trim().replace(/^\d+\. /, ''), indent };
+  }
+  return { kind: 'paragraph', text: line.trim(), indent: 0 };
+}
+
+function heading2(text: string): NotionBlock {
+  return { object: 'block', type: 'heading_2', heading_2: { rich_text: toRichText(text) } };
+}
+
+function heading3(text: string): NotionBlock {
+  return { object: 'block', type: 'heading_3', heading_3: { rich_text: toRichText(text) } };
+}
+
+function paragraph(text: string): NotionBlock {
+  return { object: 'block', type: 'paragraph', paragraph: { rich_text: toRichText(text) } };
+}
+
+function bulletItem(text: string, children: NotionBlock[] = []): NotionBlock {
+  return {
+    object: 'block',
+    type: 'bulleted_list_item',
+    bulleted_list_item: {
+      rich_text: toRichText(text),
+      ...(children.length > 0 ? { children } : {}),
+    },
+  };
+}
+
+function numberedItem(text: string, children: NotionBlock[] = []): NotionBlock {
+  return {
+    object: 'block',
+    type: 'numbered_list_item',
+    numbered_list_item: {
+      rich_text: toRichText(text),
+      ...(children.length > 0 ? { children } : {}),
+    },
+  };
+}
+
+function toggle(title: string, children: NotionBlock[]): NotionBlock {
+  return {
+    object: 'block',
+    type: 'toggle',
+    toggle: {
+      rich_text: toRichText(title),
+      ...(children.length > 0 ? { children } : {}),
+    },
+  };
+}
+
+/** 들여쓰기 불릿·번호 목록을 중첩 블록으로 변환 */
+function parseListAt(
+  lines: MdLine[],
+  start: number,
+  listKind: 'bullet' | 'numbered'
+): { blocks: NotionBlock[]; next: number } {
+  const blocks: NotionBlock[] = [];
+  let i = start;
+
+  while (i < lines.length && lines[i].kind === listKind) {
+    const item = lines[i];
+    const itemIndent = item.indent;
+    i++;
+
+    const childLines: MdLine[] = [];
+    while (i < lines.length && lines[i].kind === listKind && lines[i].indent > itemIndent) {
+      childLines.push(lines[i]);
+      i++;
+    }
+
+    let children: NotionBlock[] = [];
+    if (childLines.length > 0) {
+      const minIndent = Math.min(...childLines.map((l) => l.indent));
+      const normalized = childLines.map((l) => ({ ...l, indent: l.indent - minIndent }));
+      children = parseListAt(normalized, 0, listKind).blocks;
+    }
+
+    blocks.push(listKind === 'bullet' ? bulletItem(item.text, children) : numberedItem(item.text, children));
+  }
+
+  return { blocks, next: i };
+}
+
+function linesToBlocks(lines: MdLine[]): NotionBlock[] {
+  const blocks: NotionBlock[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (line.kind === 'h3') {
+      blocks.push(heading3(line.text));
+      i++;
+      continue;
+    }
+
+    if (line.kind === 'bullet') {
+      const { blocks: listBlocks, next } = parseListAt(lines, i, 'bullet');
+      blocks.push(...listBlocks);
+      i = next;
+      continue;
+    }
+
+    if (line.kind === 'numbered') {
+      const { blocks: listBlocks, next } = parseListAt(lines, i, 'numbered');
+      blocks.push(...listBlocks);
+      i = next;
+      continue;
+    }
+
+    if (line.kind === 'paragraph') {
+      blocks.push(paragraph(line.text));
+    }
+    i++;
+  }
+
+  return blocks;
+}
+
+/** 문서 제목 섹션 — 토글 대신 헤딩만 */
+function isDocTitleSection(title: string): boolean {
+  return /일일 리서치|주간 인사이트/.test(title);
+}
+
+function sectionToBlock(title: string, lines: MdLine[]): NotionBlock {
+  const body = linesToBlocks(lines);
+  if (body.length === 0 || isDocTitleSection(title)) {
+    return heading2(title);
+  }
+  return toggle(title, body);
+}
+
+function parseSections(md: string): { preamble: MdLine[]; sections: { title: string; lines: MdLine[] }[] } {
+  const preamble: MdLine[] = [];
+  const sections: { title: string; lines: MdLine[] }[] = [];
+  let current: { title: string; lines: MdLine[] } | null = null;
+
+  for (const raw of md.split('\n')) {
+    const parsed = parseLine(raw);
+    if (!parsed) continue;
+
+    if (parsed.kind === 'h2') {
+      if (current) sections.push(current);
+      current = { title: parsed.text, lines: [] };
+      continue;
+    }
+
+    if (current) {
+      if (parsed.kind === 'h3') {
+        current.lines.push(parsed);
+      } else if (parsed.kind === 'bullet' || parsed.kind === 'numbered' || parsed.kind === 'paragraph') {
+        current.lines.push(parsed);
+      }
     } else {
-      blocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: toRichText(line) } });
+      preamble.push(parsed);
     }
   }
+
+  if (current) sections.push(current);
+  return { preamble, sections };
+}
+
+export function markdownToBlocks(md: string): NotionBlock[] {
+  const { preamble, sections } = parseSections(md);
+  const blocks: NotionBlock[] = linesToBlocks(preamble);
+
+  for (const { title, lines } of sections) {
+    blocks.push(sectionToBlock(title, lines));
+  }
+
   return blocks;
+}
+
+/** 중첩 포함 블록 개수 (로깅용) */
+export function countBlocks(blocks: NotionBlock[]): number {
+  let n = 0;
+  for (const b of blocks) {
+    n++;
+    const key = Object.keys(b).find((k) => k !== 'object' && k !== 'type' && typeof b[k] === 'object');
+    if (!key) continue;
+    const node = b[key] as { children?: NotionBlock[] };
+    if (node.children?.length) n += countBlocks(node.children);
+  }
+  return n;
 }

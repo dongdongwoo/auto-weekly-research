@@ -1,5 +1,5 @@
 import { extractLinks, splitTopLevelBullets } from './links.js';
-import { listDailyFiles, readDaily } from './storage.js';
+import { fetchDailyLogsInRange, cutoffIso } from './notionRead.js';
 
 export type KnownItem = {
   date: string;
@@ -57,27 +57,16 @@ export function isSimilarHeadline(a: string, b: string): boolean {
   return longer.includes(shorter);
 }
 
-function parseIsoDate(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
-function cutoffIso(beforeIso: string, lookbackDays: number): string {
-  const d = parseIsoDate(beforeIso);
-  d.setUTCDate(d.getUTCDate() - lookbackDays);
-  return d.toISOString().slice(0, 10);
-}
-
-/** 수집 대상 날짜 이전 N일간 이미 수집된 URL·헤드라인 */
-export function loadKnownItems(beforeDateIso: string, lookbackDays: number): KnownItem[] {
+/** 수집 대상 날짜 이전 N일간 Notion에 이미 수집된 URL·헤드라인 */
+export async function loadKnownItems(
+  beforeDateIso: string,
+  lookbackDays: number
+): Promise<KnownItem[]> {
   const cutoff = cutoffIso(beforeDateIso, lookbackDays);
   const items: KnownItem[] = [];
+  const logs = await fetchDailyLogsInRange(cutoff, beforeDateIso);
 
-  for (const iso of listDailyFiles()) {
-    if (iso >= beforeDateIso || iso < cutoff) continue;
-    const content = readDaily(iso);
-    if (!content) continue;
-
+  for (const { iso, content } of logs) {
     for (const block of splitTopLevelBullets(content)) {
       if (isPlaceholderBullet(block)) continue;
       const headline = headlineFromBlock(block);
@@ -191,5 +180,5 @@ export function formatKnownForPrompt(known: KnownItem[], maxItems = 80): string 
 
 export function logKnownSummary(known: KnownItem[]): void {
   const urls = new Set(known.map((k) => k.url));
-  console.log(`📋 중복 체크: 최근 1달 기준 ${known.length}건 (URL ${urls.size}개)`);
+  console.log(`📋 중복 체크 (Notion 최근 1달): ${known.length}건 (URL ${urls.size}개)`);
 }

@@ -14,7 +14,7 @@ export function kstToday(): { iso: string; human: string } {
   return formatKstDate(kstNow());
 }
 
-/** 수집 대상 = 전날 (매일 아침 9시 실행 기준) */
+/** 수집 대상 = 전날 (매일 아침 8시 실행 기준) */
 export function kstYesterday(): { iso: string; human: string } {
   const d = kstNow();
   d.setUTCDate(d.getUTCDate() - 1);

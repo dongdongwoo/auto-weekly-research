@@ -1,8 +1,10 @@
 import { Client } from '@notionhq/client';
 import { config } from './config.js';
-import { markdownToBlocks, toRichText, NotionBlock } from './markdown.js';
+import { markdownToBlocks, toRichText, NotionBlock, countBlocks } from './markdown.js';
 
 const notion = new Client({ auth: config.notionApiKey });
+
+export { notion };
 
 const CHUNK = 90;
 
@@ -65,7 +67,7 @@ export async function appendDigest(
     }
   }
 
-  console.log(`✅ 노션 업데이트 완료 (블록 ${children.length}개)`);
+  console.log(`✅ 노션 업데이트 완료 (블록 ${countBlocks(children)}개)`);
 }
 
 /** 연결 사전 점검 — NOTION_PAGE_ID = 주간 페이지들이 생성될 부모(허브) 페이지 */

@@ -1,6 +1,8 @@
 # auto-weekly-research
 
-매일 KST 09:00 — 전날 뉴스 수집 → Notion (월~일). **월요일** — 지난주 마감(일요일 일일) → 주간 인사이트 → **이번 주 페이지 생성** (화요일부터 일일 등록).
+매일 KST 08:00 — 전날 뉴스 수집 → Notion (월~일). **월요일** — 지난주 마감(일요일 일일) → 주간 인사이트 → **이번 주 페이지 생성** (화요일부터 일일 등록).
+
+**데이터는 Notion만 사용** — 로컬 `data/` 파일·git pull 불필요. 중복 제거·주간 인사이트 모두 Notion에서 읽습니다.
 
 ## 사용
 
@@ -31,25 +33,23 @@ Integration을 허브 페이지에 연결해야 함.
 
 ## 자동 실행
 
-**GitHub Actions** — push + Secrets 3개 (`CLAUDE_CODE_OAUTH_TOKEN`, `NOTION_API_KEY`, `NOTION_PAGE_ID`). 매일 KST 09:00.
+**GitHub Actions** — push + Secrets 3개 (`CLAUDE_CODE_OAUTH_TOKEN`, `NOTION_API_KEY`, `NOTION_PAGE_ID`). 매일 KST 08:00.
 
 ## 파일 구조
 
 ```
 src/
-├── index.ts      # 진입점, morning/daily/weekly 분기
-├── config.ts     # .env 로드
-├── claude.ts     # Agent SDK (일일=WebSearch, 주간=원문만)
-├── prompt.ts     # 일일·주간 프롬프트
-├── notion.ts     # Notion 토글 추가
-├── weekPage.ts   # 주간 하위 페이지 생성·ID 캐시
-├── storage.ts    # data/daily/ 저장·읽기
+├── index.ts        # 진입점, morning/daily/weekly 분기
+├── config.ts       # .env 로드
+├── claude.ts       # Agent SDK (일일=WebSearch, 주간=원문만)
+├── prompt.ts       # 일일·주간 프롬프트
+├── notion.ts       # Notion 쓰기 (토글 추가)
+├── notionRead.ts   # Notion 읽기 (중복·주간 입력)
+├── weekPage.ts     # 주간 하위 페이지 찾기·생성
 ├── kst.ts          # KST 날짜, ISO 주차
 ├── dedup.ts        # 1달 중복 제거
 ├── links.ts        # 출처 링크 검증
 └── markdown.ts     # md → Notion 블록
 
-data/daily/         # 일일 원문
-data/weeks/         # 주간 Notion pageId
 .github/workflows/  # Actions 스케줄
 ```
