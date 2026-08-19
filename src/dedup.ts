@@ -1,4 +1,4 @@
-import { extractLinks } from './links.js';
+import { extractLinks, splitTopLevelBullets } from './links.js';
 import { listDailyFiles, readDaily } from './storage.js';
 
 export type KnownItem = {
@@ -96,23 +96,6 @@ export function loadKnownItems(beforeDateIso: string, lookbackDays: number): Kno
 
 function isPlaceholderBullet(block: string): boolean {
   return /해당 없음|신규 항목 없음/.test(block);
-}
-
-/** 최상위 불릿 블록 분리 (하위 들여쓰기 불릿 포함) */
-export function splitTopLevelBullets(md: string): string[] {
-  const blocks: string[] = [];
-  let current: string[] = [];
-
-  for (const line of md.split('\n')) {
-    if (/^[-*] /.test(line)) {
-      if (current.length) blocks.push(current.join('\n'));
-      current = [line];
-    } else if (current.length) {
-      current.push(line);
-    }
-  }
-  if (current.length) blocks.push(current.join('\n'));
-  return blocks;
 }
 
 function isKnownBlock(block: string, known: KnownItem[]): boolean {
