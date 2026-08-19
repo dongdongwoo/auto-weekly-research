@@ -51,16 +51,33 @@ async function fetchAllBlocks(blockId: string): Promise<NotionBlock[]> {
   return blocks;
 }
 
-async function blockToMarkdownLines(block: NotionBlock, bulletDepth = 0): Promise<string[]> {
+async function blockToMarkdownLines(
+  block: NotionBlock,
+  bulletDepth = 0,
+  ctx: { inAxis?: boolean } = {}
+): Promise<string[]> {
   const lines: string[] = [];
   const prefix = '  '.repeat(bulletDepth);
 
   switch (block.type) {
     case 'toggle': {
       const title = toggleTitle(block);
-      if (!/^📰|^📊/.test(title)) lines.push(`## ${title}`);
-      for (const child of await fetchAllBlocks(block.id)) {
-        lines.push(...(await blockToMarkdownLines(child, bulletDepth)));
+      if (/^📰|^📊/.test(title)) {
+        for (const child of await fetchAllBlocks(block.id)) {
+          lines.push(...(await blockToMarkdownLines(child, bulletDepth, ctx)));
+        }
+        break;
+      }
+      if (ctx.inAxis) {
+        lines.push(`### ${title}`);
+        for (const child of await fetchAllBlocks(block.id)) {
+          lines.push(...(await blockToMarkdownLines(child, bulletDepth, { inAxis: false })));
+        }
+      } else {
+        lines.push(`## ${title}`);
+        for (const child of await fetchAllBlocks(block.id)) {
+          lines.push(...(await blockToMarkdownLines(child, bulletDepth, { inAxis: true })));
+        }
       }
       break;
     }
@@ -76,7 +93,7 @@ async function blockToMarkdownLines(block: NotionBlock, bulletDepth = 0): Promis
       );
       lines.push(`${prefix}- ${text}`);
       for (const child of await fetchAllBlocks(block.id)) {
-        lines.push(...(await blockToMarkdownLines(child, bulletDepth + 1)));
+        lines.push(...(await blockToMarkdownLines(child, bulletDepth + 1, ctx)));
       }
       break;
     }
@@ -86,7 +103,15 @@ async function blockToMarkdownLines(block: NotionBlock, bulletDepth = 0): Promis
       );
       lines.push(`${prefix}1. ${text}`);
       for (const child of await fetchAllBlocks(block.id)) {
-        lines.push(...(await blockToMarkdownLines(child, bulletDepth + 1)));
+        lines.push(...(await blockToMarkdownLines(child, bulletDepth + 1, ctx)));
+      }
+      break;
+    }
+    case 'callout': {
+      const text = richTextToMarkdown((block.callout as { rich_text: NotionRichText[]; icon?: { emoji?: string } }).rich_text);
+      const emoji = (block.callout as { icon?: { emoji?: string } }).icon?.emoji;
+      if (text.trim()) {
+        lines.push(emoji === '🔭' ? `**전망** · ${text}` : `**분석** · ${text}`);
       }
       break;
     }

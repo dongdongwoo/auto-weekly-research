@@ -14,9 +14,18 @@ npm run morning        # 일일 (+ 월요일 주간)
 
 | 명령              | 설명             |
 | ----------------- | ---------------- |
-| `npm run morning` | 일일 + (월) 주간·이번 주 페이지 생성 |
-| `npm run collect` | 일일만           |
-| `npm run weekly`  | 주간만           |
+| `npm run morning` | **매일 자동 실행용.** 일일 + (월요일만) 주간 인사이트·이번 주 페이지 |
+| `npm run collect` | 일일만 (수동)    |
+| `npm run weekly`  | 주간만 (수동)    |
+
+## 스케줄 (KST 08:00, GitHub Actions = `npm run morning`)
+
+| 요일 | 실행 내용 |
+| ---- | --------- |
+| **월** | ① 일요일 일일 → 지난주 페이지 · ② **주간 인사이트**(요약·전망·시사점) → 지난주 페이지 · ③ 이번 주 페이지 생성 |
+| 화~일 | 전날 일일 리서치 → 해당 주 Notion 페이지 |
+
+`--weekly` / `collect`는 **수동 재실행**용이고, Actions cron에는 `morning` 하나만 등록되어 있습니다.
 
 ## Notion 구조
 

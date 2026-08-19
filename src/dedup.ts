@@ -1,5 +1,6 @@
-import { extractLinks, splitTopLevelBullets } from './links.js';
+import { extractLinks } from './links.js';
 import { fetchDailyLogsInRange, cutoffIso } from './notionRead.js';
+import { splitNewsItems, headlineFromItem, isPlaceholderItem } from './newsItems.js';
 
 export type KnownItem = {
   date: string;
@@ -39,10 +40,9 @@ export function normalizeHeadline(text: string): string {
     .trim();
 }
 
-/** 불릿 블록에서 헤드라인 추출 */
+/** 불릿/### 블록에서 헤드라인 추출 */
 function headlineFromBlock(block: string): string | null {
-  const m = block.match(/\*\*([^*]+)\*\*/);
-  return m ? m[1].trim() : null;
+  return headlineFromItem(block);
 }
 
 /** 헤드라인 유사 중복 (완전 일치 또는 한쪽이 80% 이상 포함) */
@@ -67,8 +67,8 @@ export async function loadKnownItems(
   const logs = await fetchDailyLogsInRange(cutoff, beforeDateIso);
 
   for (const { iso, content } of logs) {
-    for (const block of splitTopLevelBullets(content)) {
-      if (isPlaceholderBullet(block)) continue;
+    for (const block of splitNewsItems(content)) {
+      if (isPlaceholderItem(block)) continue;
       const headline = headlineFromBlock(block);
       for (const { url } of extractLinks(block)) {
         items.push({
@@ -84,11 +84,11 @@ export async function loadKnownItems(
 }
 
 function isPlaceholderBullet(block: string): boolean {
-  return /해당 없음|신규 항목 없음/.test(block);
+  return isPlaceholderItem(block);
 }
 
 function isKnownBlock(block: string, known: KnownItem[]): boolean {
-  if (isPlaceholderBullet(block)) return false;
+  if (isPlaceholderItem(block)) return false;
 
   const headline = headlineFromBlock(block);
   const urls = extractLinks(block).map((l) => normalizeUrl(l.url));
@@ -111,8 +111,35 @@ export function stripDuplicates(content: string, known: KnownItem[]): DedupResul
   while (i < lines.length) {
     const line = lines[i];
 
-    // 맨 아래 참고 출처 섹션은 제거 (항목별 출처 줄에 링크 있음)
     if (/^## 참고 출처/.test(line.trim())) break;
+
+    // ### 뉴스 항목 블록
+    if (/^### /.test(line)) {
+      const blockLines = [line];
+      i++;
+      while (
+        i < lines.length &&
+        !/^### /.test(lines[i]) &&
+        !/^## /.test(lines[i]) &&
+        !/^[-*] /.test(lines[i])
+      ) {
+        blockLines.push(lines[i]);
+        i++;
+      }
+      const block = blockLines.join('\n');
+
+      if (isKnownBlock(block, known)) {
+        removedCount++;
+        console.log(`  ↩ 중복 제거: ${headlineFromBlock(block) ?? block.slice(0, 60)}…`);
+        continue;
+      }
+
+      if (!isPlaceholderItem(block) && extractLinks(block).length > 0) {
+        remainingCount++;
+      }
+      out.push(...blockLines);
+      continue;
+    }
 
     if (/^[-*] /.test(line)) {
       const blockLines = [line];
@@ -129,7 +156,7 @@ export function stripDuplicates(content: string, known: KnownItem[]): DedupResul
         continue;
       }
 
-      if (!isPlaceholderBullet(block) && extractLinks(block).length > 0) {
+      if (!isPlaceholderItem(block) && extractLinks(block).length > 0) {
         remainingCount++;
       }
       out.push(...blockLines);

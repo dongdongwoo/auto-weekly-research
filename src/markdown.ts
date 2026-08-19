@@ -1,9 +1,11 @@
 /**
  * 다이제스트 마크다운을 노션 블록으로 변환한다.
- * - ## 섹션 → 토글 (축별 한눈에 보기)
- * - 들여쓰기 불릿 → 중첩 bulleted_list_item
- * - **볼드**, [텍스트](URL) rich_text
+ * - ## 섹션(축) → 토글
+ * - ### 기사 → 토글 (제목만 보이게)
+ * - **요약** / **분석** / **출처** → 문단·콜아웃
  */
+
+import { normalizeDigestMarkdown } from './newsItems.js';
 
 type RichText = {
   type: 'text';
@@ -103,6 +105,57 @@ function numberedItem(text: string, children: NotionBlock[] = []): NotionBlock {
   };
 }
 
+function callout(text: string, emoji: string): NotionBlock {
+  return {
+    object: 'block',
+    type: 'callout',
+    callout: {
+      rich_text: toRichText(text) as unknown as RichText[],
+      icon: { type: 'emoji', emoji },
+    },
+  };
+}
+
+function labeledLineToBlock(text: string): NotionBlock {
+  const trimmed = text.trim();
+  if (/^\*\*요약\*\*/.test(trimmed) || /^요약\s*[·:]/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*요약\*\*\s*[·—]?\s*/, '**요약** · '));
+  }
+  if (/^\*\*분석\*\*/.test(trimmed) || /^분석\s*[·:]/.test(trimmed)) {
+    const body = trimmed.replace(/^\*\*분석\*\*\s*[·—]?\s*/, '');
+    return callout(body, '💡');
+  }
+  if (/^\*\*출처\*\*/.test(trimmed) || /^출처\s*[·:]/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*출처\*\*\s*[·—]?\s*/, '**🔗 출처** · '));
+  }
+  if (/^\*\*근거\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*근거\*\*\s*[·—]?\s*/, '**근거** · '));
+  }
+  if (/^\*\*전망\*\*/.test(trimmed)) {
+    return callout(trimmed.replace(/^\*\*전망\*\*\s*[·—]?\s*/, ''), '🔭');
+  }
+  if (/^\*\*내용\*\*/.test(trimmed) || /^\*\*시사점\*\*/.test(trimmed)) {
+    return paragraph(trimmed);
+  }
+  return paragraph(trimmed);
+}
+
+/** ### 기사 → 토글, 내부는 요약/분석/출처 블록 */
+function newsItemToToggle(title: string, lines: MdLine[]): NotionBlock {
+  const children: NotionBlock[] = [];
+  for (const line of lines) {
+    if (line.kind === 'paragraph') {
+      children.push(labeledLineToBlock(line.text));
+    } else if (line.kind === 'bullet') {
+      children.push(labeledLineToBlock(line.text));
+    } else {
+      children.push(...linesToBlocks([line]));
+    }
+  }
+  const cleanTitle = title.replace(/^\[|\]$/g, '').replace(/\*\*/g, '');
+  return toggle(cleanTitle, children);
+}
+
 function toggle(title: string, children: NotionBlock[]): NotionBlock {
   return {
     object: 'block',
@@ -112,6 +165,35 @@ function toggle(title: string, children: NotionBlock[]): NotionBlock {
       ...(children.length > 0 ? { children } : {}),
     },
   };
+}
+
+/** 섹션 본문: ### 기사 토글 + 나머지 */
+function sectionLinesToBlocks(lines: MdLine[]): NotionBlock[] {
+  const blocks: NotionBlock[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (lines[i].kind === 'h3') {
+      const title = lines[i].text;
+      const bodyLines: MdLine[] = [];
+      i++;
+      while (i < lines.length && lines[i].kind !== 'h3') {
+        bodyLines.push(lines[i]);
+        i++;
+      }
+      blocks.push(newsItemToToggle(title, bodyLines));
+      continue;
+    }
+
+    const run: MdLine[] = [];
+    while (i < lines.length && lines[i].kind !== 'h3') {
+      run.push(lines[i]);
+      i++;
+    }
+    blocks.push(...linesToBlocks(run));
+  }
+
+  return blocks;
 }
 
 /** 들여쓰기 불릿·번호 목록을 중첩 블록으로 변환 */
@@ -189,8 +271,11 @@ function isDocTitleSection(title: string): boolean {
 }
 
 function sectionToBlock(title: string, lines: MdLine[]): NotionBlock {
-  const body = linesToBlocks(lines);
-  if (body.length === 0 || isDocTitleSection(title)) {
+  if (isDocTitleSection(title)) {
+    return heading2(title);
+  }
+  const body = sectionLinesToBlocks(lines);
+  if (body.length === 0) {
     return heading2(title);
   }
   return toggle(title, body);
@@ -227,7 +312,8 @@ function parseSections(md: string): { preamble: MdLine[]; sections: { title: str
 }
 
 export function markdownToBlocks(md: string): NotionBlock[] {
-  const { preamble, sections } = parseSections(md);
+  const normalized = normalizeDigestMarkdown(md);
+  const { preamble, sections } = parseSections(normalized);
   const blocks: NotionBlock[] = linesToBlocks(preamble);
 
   for (const { title, lines } of sections) {

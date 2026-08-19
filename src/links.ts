@@ -1,5 +1,7 @@
 /** 마크다운 본문의 출처 링크 검증 — 할루시네이션 방지용 */
 
+import { splitNewsItems, isPlaceholderItem } from './newsItems.js';
+
 const LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
 
 export function extractLinks(md: string): { label: string; url: string }[] {
@@ -37,22 +39,6 @@ function bodyWithoutSourcesSection(md: string): string {
   return md.replace(/\n## 참고 출처[\s\S]*$/, '');
 }
 
-function groupItemBlocks(blocks: string[]): string[] {
-  const groups: string[] = [];
-  let current: string[] = [];
-
-  for (const block of blocks) {
-    current.push(block);
-    // 출처 줄이 오면 한 뉴스 항목 완료
-    if (/\[[^\]]+\]\(https?:\/\//.test(block)) {
-      groups.push(current.join('\n'));
-      current = [];
-    }
-  }
-  if (current.length) groups.push(current.join('\n'));
-  return groups;
-}
-
 /**
  * 수집 항목마다 최소 1개 출처 링크 필요.
  * 헤드라인 / 분석 / 출처가 각각 불릿이어도 한 항목으로 묶어 검사.
@@ -64,22 +50,23 @@ export function assertSourceLinks(md: string, label: string): void {
   }
 
   const body = bodyWithoutSourcesSection(md);
-  const itemBlocks = splitTopLevelBullets(body).filter((b) => !isPlaceholderBlock(b));
+  const items = splitNewsItems(body);
 
-  if (itemBlocks.length === 0) {
+  if (items.length === 0) {
     console.log(`🔗 ${label}: 수집 항목 없음 — 출처 검증 생략`);
     return;
   }
 
-  const groups = groupItemBlocks(itemBlocks);
-  const groupsWithoutLink = groups.filter((g) => !/\[[^\]]+\]\(https?:\/\//.test(g));
+  const withoutLink = items.filter(
+    (item) => !isPlaceholderItem(item) && !/\[[^\]]+\]\(https?:\/\//.test(item)
+  );
 
-  if (groupsWithoutLink.length > 0) {
+  if (withoutLink.length > 0) {
     throw new Error(
-      `${label}: 출처 링크 없는 항목 ${groupsWithoutLink.length}개 — 각 뉴스에 [출처](URL) 필수`
+      `${label}: 출처 링크 없는 항목 ${withoutLink.length}개 — 각 뉴스에 **출처** · [매체](URL) 필수`
     );
   }
 
   const links = extractLinks(body);
-  console.log(`🔗 출처 검증 통과: 항목 ${groups.length}개, 링크 ${links.length}개`);
+  console.log(`🔗 출처 검증 통과: 항목 ${items.length}개, 링크 ${links.length}개`);
 }

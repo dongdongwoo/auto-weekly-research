@@ -1,5 +1,8 @@
 name: Morning Routine
 
+# npm run morning = 매일 일일 + (월요일 KST) 주간 인사이트·이번 주 페이지까지 한 번에 실행
+# --weekly / --daily 는 수동 재실행용. Actions 스케줄은 morning 만 사용.
+
 on:
   schedule:
     # 매일 KST 08:00 = UTC 23:00 (전날)
@@ -10,6 +13,7 @@ permissions:
   contents: read
 
 jobs:
+  # job 이름은 morning 이지만, 월요일 08:00 KST에는 runMorning() 안에서 주간 작업도 이어서 실행됨
   morning:
     runs-on: ubuntu-latest
     steps:

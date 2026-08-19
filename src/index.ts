@@ -11,6 +11,7 @@ import {
   formatKnownForPrompt,
   logKnownSummary,
 } from './dedup.js';
+import { normalizeDigestMarkdown } from './newsItems.js';
 import { ensureAuth, config } from './config.js';
 
 type Mode = 'daily' | 'weekly' | 'morning' | 'monthly';
@@ -34,7 +35,8 @@ async function runDaily(weekPageId: string) {
 
   const prompt = dailyPrompt(runHuman, newsHuman, newsIso, formatKnownForPrompt(known));
   const raw = await generateWithSearch(prompt);
-  const { content, removedCount, remainingCount } = stripDuplicates(raw, known);
+  const normalized = normalizeDigestMarkdown(raw);
+  const { content, removedCount, remainingCount } = stripDuplicates(normalized, known);
 
   if (removedCount > 0) {
     console.log(`🔄 중복 ${removedCount}건 제거, 신규 ${remainingCount}건`);
@@ -80,8 +82,15 @@ async function runMonthly() {
   await appendDigest(config.notionPageId, `📚 ${iso} 월간 딥다이브`, content);
 }
 
-/** 매일: 전날 일일 리서치 + (월요일) 지난주 마감 → 주간 인사이트 → 이번 주 페이지 생성 */
+/** 매일: 전날 일일 + (월요일) 지난주 주간 인사이트 + 이번 주 페이지 생성 */
 async function runMorning() {
+  const monday = isMondayKst();
+  console.log(
+    monday
+      ? '🌅 오늘 월요일 — 일일(일요일) → 주간 인사이트 → 이번 주 페이지 순서로 실행'
+      : '🌅 일일 리서치만 실행 (주간 인사이트는 월요일 아침에 자동 실행)'
+  );
+
   const { iso: newsIso } = kstYesterday();
 
   // 전날(일요일) 뉴스는 해당 ISO 주(지난주) 페이지에 등록
