@@ -111,23 +111,6 @@ function isKnownBlock(block: string, known: KnownItem[]): boolean {
   return false;
 }
 
-/** 참고 출처 섹션 재생성 */
-function rebuildSourcesSection(body: string): string {
-  const withoutSources = body.replace(/\n## 참고 출처[\s\S]*$/, '').trimEnd();
-  const sourceLines = ['', '## 참고 출처'];
-  const seen = new Set<string>();
-
-  for (const { label, url } of extractLinks(withoutSources)) {
-    const key = normalizeUrl(url);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    sourceLines.push(`- [${label}](${url})`);
-  }
-
-  if (seen.size === 0) return withoutSources + '\n';
-  return withoutSources + sourceLines.join('\n') + '\n';
-}
-
 /** 생성된 일일 리서치에서 기수집 항목 제거 */
 export function stripDuplicates(content: string, known: KnownItem[]): DedupResult {
   const lines = content.split('\n');
@@ -139,7 +122,7 @@ export function stripDuplicates(content: string, known: KnownItem[]): DedupResul
   while (i < lines.length) {
     const line = lines[i];
 
-    // 참고 출처 섹션은 나중에 재생성
+    // 맨 아래 참고 출처 섹션은 제거 (항목별 출처 줄에 링크 있음)
     if (/^## 참고 출처/.test(line.trim())) break;
 
     if (/^[-*] /.test(line)) {
@@ -173,22 +156,20 @@ export function stripDuplicates(content: string, known: KnownItem[]): DedupResul
   if (remainingCount === 0 && removedCount > 0) {
     result = appendNoNewItemsNotice(result);
   } else {
-    result = rebuildSourcesSection(result);
+    result = stripSourcesSection(result);
   }
 
   return { content: result.trim() + '\n', removedCount, remainingCount };
 }
 
+function stripSourcesSection(body: string): string {
+  const trimmed = body.replace(/\n## 참고 출처[\s\S]*$/, '').trimEnd();
+  return trimmed ? trimmed + '\n' : '\n';
+}
+
 function appendNoNewItemsNotice(body: string): string {
   const trimmed = body.trimEnd();
-  const notice = [
-    '',
-    '## 요약',
-    '- 이전 수집과 **중복** — 오늘 날짜 기준 **신규 항목 없음**',
-    '',
-    '## 참고 출처',
-    '- (신규 없음)',
-  ].join('\n');
+  const notice = ['', '## 요약', '- 이전 수집과 **중복** — 오늘 날짜 기준 **신규 항목 없음**'].join('\n');
   return trimmed + '\n' + notice + '\n';
 }
 

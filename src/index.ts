@@ -2,8 +2,8 @@ import { generateWithSearch, generateFromContext } from './claude.js';
 import { appendDigest, checkConnection } from './notion.js';
 import { dailyPrompt, weeklyInsightPrompt, monthlyPrompt } from './prompt.js';
 import { assertSourceLinks } from './links.js';
-import { kstToday, kstYesterday, isoWeekId, isFridayKst, workWeekNewsDates } from './kst.js';
-import { saveDaily, readWorkWeekDaily } from './storage.js';
+import { kstToday, kstYesterday, isoWeekId, isMondayKst, weekNewsDates } from './kst.js';
+import { saveDaily, readWeekDaily } from './storage.js';
 import { ensureWeekPage } from './weekPage.js';
 import {
   loadKnownItems,
@@ -22,13 +22,7 @@ function parseMode(): Mode {
   return 'daily';
 }
 
-async function resolveWeekPage(): Promise<string> {
-  const { iso: todayIso } = kstToday();
-  const weekId = isoWeekId(todayIso);
-  return ensureWeekPage(weekId, todayIso);
-}
-
-/** 전날 뉴스 검색·분석 → 로컬 저장 + 주간 페이지에 날짜 토글 */
+/** 전날 뉴스 검색·분석 → 로컬 저장 + 해당 주 Notion 페이지에 토글 */
 async function runDaily(weekPageId: string) {
   const { human: runHuman } = kstToday();
   const { iso: newsIso, human: newsHuman } = kstYesterday();
@@ -38,12 +32,7 @@ async function runDaily(weekPageId: string) {
   const known = loadKnownItems(newsIso, config.dedupLookbackDays);
   logKnownSummary(known);
 
-  const prompt = dailyPrompt(
-    runHuman,
-    newsHuman,
-    newsIso,
-    formatKnownForPrompt(known)
-  );
+  const prompt = dailyPrompt(runHuman, newsHuman, newsIso, formatKnownForPrompt(known));
   const raw = await generateWithSearch(prompt);
   const { content, removedCount, remainingCount } = stripDuplicates(raw, known);
 
@@ -57,16 +46,17 @@ async function runDaily(weekPageId: string) {
   await appendDigest(weekPageId, `📰 ${newsIso}`, content);
 }
 
-/** 월~금 일일 리서치 → 주간 인사이트 토글 (같은 주간 페이지) */
-async function runWeekly(weekPageId: string) {
-  const { iso: todayIso, human: runHuman } = kstToday();
-  const weekId = isoWeekId(todayIso);
-  const newsDates = workWeekNewsDates(todayIso);
-  const dailyLogs = readWorkWeekDaily(todayIso);
+/** 월~일 일일 리서치 → 주간 인사이트 토글 */
+async function runWeekly(weekAnchorIso: string) {
+  const { human: runHuman } = kstToday();
+  const weekId = isoWeekId(weekAnchorIso);
+  const weekPageId = await ensureWeekPage(weekId, weekAnchorIso);
+  const newsDates = weekNewsDates(weekAnchorIso);
+  const dailyLogs = readWeekDaily(weekAnchorIso);
 
   if (dailyLogs.length === 0) {
     throw new Error(
-      `이번 주(${weekId}) 일일 리서치가 없습니다. 월~금 아침에 npm run morning 을 먼저 실행하세요.`
+      `주간(${weekId}) 일일 리서치가 없습니다. npm run morning 을 먼저 실행하세요.`
     );
   }
 
@@ -88,17 +78,25 @@ async function runMonthly() {
   const prompt = monthlyPrompt(human);
   const content = await generateWithSearch(prompt);
   assertSourceLinks(content, '월간 딥다이브');
-  // 월간은 허브 페이지에 직접 추가
   await appendDigest(config.notionPageId, `📚 ${iso} 월간 딥다이브`, content);
 }
 
-/** 매일 아침: (월요일이면 주간 페이지 생성 →) 일일 리서치 + (금요일) 주간 인사이트 */
+/** 매일: 전날 일일 리서치 + (월요일) 지난주 마감 → 주간 인사이트 → 이번 주 페이지 생성 */
 async function runMorning() {
-  const weekPageId = await resolveWeekPage();
-  await runDaily(weekPageId);
-  if (isFridayKst()) {
-    console.log('\n📊 금요일 — 주간 인사이트 작성 시작');
-    await runWeekly(weekPageId);
+  const { iso: newsIso } = kstYesterday();
+
+  // 전날(일요일) 뉴스는 해당 ISO 주(지난주) 페이지에 등록
+  const lastWeekPageId = await ensureWeekPage(isoWeekId(newsIso), newsIso);
+  await runDaily(lastWeekPageId);
+
+  if (isMondayKst()) {
+    console.log('\n📊 월요일 — 지난주 주간 인사이트 작성');
+    await runWeekly(newsIso);
+
+    const { iso: todayIso } = kstToday();
+    const thisWeekId = isoWeekId(todayIso);
+    console.log(`\n🗓️ 이번 주(${thisWeekId}) 페이지 생성 — 화요일부터 일일 리서치 등록`);
+    await ensureWeekPage(thisWeekId, todayIso);
   }
 }
 
@@ -111,16 +109,15 @@ async function main() {
     case 'morning':
       await runMorning();
       break;
-    case 'weekly': {
-      const weekPageId = await resolveWeekPage();
-      await runWeekly(weekPageId);
+    case 'weekly':
+      await runWeekly(kstYesterday().iso);
       break;
-    }
     case 'monthly':
       await runMonthly();
       break;
     default: {
-      const weekPageId = await resolveWeekPage();
+      const { iso: newsIso } = kstYesterday();
+      const weekPageId = await ensureWeekPage(isoWeekId(newsIso), newsIso);
       await runDaily(weekPageId);
     }
   }

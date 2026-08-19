@@ -37,7 +37,7 @@ export const config = {
   notionApiKey: required('NOTION_API_KEY'),
   notionPageId: required('NOTION_PAGE_ID'),
   model: process.env.CLAUDE_MODEL ?? 'claude-fable-5',
-  maxTurns: Number(process.env.MAX_TURNS ?? 20),
+  maxTurns: Number(process.env.MAX_TURNS ?? 30),
   /** 중복 체크: 최근 1달(30일) */
   dedupLookbackDays: 30,
 };

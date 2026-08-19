@@ -18,7 +18,7 @@ export async function createWeekPage(title: string): Promise<string> {
         object: 'block',
         type: 'callout',
         callout: {
-          rich_text: toRichText('매일 아침 **일일 리서치**가 날짜별 토글로 쌓입니다. 금요일에 **주간 인사이트** 토글이 추가됩니다.') as any,
+          rich_text: toRichText('매일 **일일 리서치**(월~일)가 날짜별 토글로 쌓입니다. **월요일** 아침에 지난주 **주간 인사이트**가 추가된 뒤, 이번 주 페이지가 준비됩니다 (화요일부터 일일 등록).') as any,
           icon: { type: 'emoji', emoji: '📌' },
         },
       } as any,

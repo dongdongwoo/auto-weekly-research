@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { workWeekNewsDates } from './kst.js';
+import { weekNewsDates } from './kst.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data', 'daily');
 
@@ -31,9 +31,9 @@ export function readDaily(newsDateIso: string): string | null {
   return fs.readFileSync(p, 'utf8').trim();
 }
 
-/** 이번 주 월~금 뉴스 날짜에 해당하는 일일 수집본 (없는 날은 제외) */
-export function readWorkWeekDaily(todayIso: string): { iso: string; content: string }[] {
-  return workWeekNewsDates(todayIso)
+/** 해당 주(월~일) 일일 수집본 (없는 날은 제외) */
+export function readWeekDaily(weekAnchorIso: string): { iso: string; content: string }[] {
+  return weekNewsDates(weekAnchorIso)
     .map((iso) => ({ iso, content: readDaily(iso) }))
     .filter((d): d is { iso: string; content: string } => d.content !== null && d.content.length > 0);
 }

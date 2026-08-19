@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { workWeekNewsDates, isMondayKst } from './kst.js';
+import { weekNewsDates } from './kst.js';
 import { createWeekPage } from './notion.js';
 
 const WEEKS_DIR = path.join(process.cwd(), 'data', 'weeks');
@@ -32,31 +32,23 @@ function formatShortDate(iso: string): string {
   return `${Number(m)}/${Number(d)}`;
 }
 
-function weekPageTitle(weekId: string, todayIso: string): string {
-  const [mon, , , , fri] = workWeekNewsDates(todayIso);
-  return `📊 ${weekId} 주간 (${formatShortDate(mon)} ~ ${formatShortDate(fri)})`;
+function weekPageTitle(weekId: string, weekAnchorIso: string): string {
+  const [mon, , , , , , sun] = weekNewsDates(weekAnchorIso);
+  return `📊 ${weekId} 주간 (${formatShortDate(mon)} ~ ${formatShortDate(sun)})`;
 }
 
-/**
- * 이번 주 Notion 하위 페이지를 반환한다.
- * - 월요일: 부모 페이지(NOTION_PAGE_ID) 아래 새 주간 페이지 생성
- * - 화~금: 저장된 pageId 재사용 (월요일을 놓친 경우 그때 생성)
- */
-export async function ensureWeekPage(weekId: string, todayIso: string): Promise<string> {
+/** 해당 ISO 주의 Notion 하위 페이지 (없으면 생성) */
+export async function ensureWeekPage(weekId: string, weekAnchorIso: string): Promise<string> {
   const existing = loadWeekMeta(weekId);
   if (existing) {
-    console.log(`📂 주간 페이지 재사용: ${weekPageTitle(weekId, todayIso)}`);
+    console.log(`📂 주간 페이지 재사용: ${weekPageTitle(weekId, weekAnchorIso)}`);
     return existing.pageId;
   }
 
-  const title = weekPageTitle(weekId, todayIso);
-  if (isMondayKst()) {
-    console.log(`🆕 월요일 — 새 주간 페이지 생성: "${title}"`);
-  } else {
-    console.log(`🆕 주간 페이지 없음 — 생성: "${title}"`);
-  }
+  const title = weekPageTitle(weekId, weekAnchorIso);
+  console.log(`🆕 주간 페이지 생성: "${title}"`);
 
   const pageId = await createWeekPage(title);
-  saveWeekMeta({ weekId, pageId, createdAt: todayIso });
+  saveWeekMeta({ weekId, pageId, createdAt: weekAnchorIso });
   return pageId;
 }

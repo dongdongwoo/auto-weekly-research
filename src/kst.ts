@@ -21,10 +21,6 @@ export function kstYesterday(): { iso: string; human: string } {
   return formatKstDate(d);
 }
 
-export function isFridayKst(): boolean {
-  return kstNow().getUTCDay() === 5;
-}
-
 export function isMondayKst(): boolean {
   return kstNow().getUTCDay() === 1;
 }
@@ -39,15 +35,15 @@ export function isoWeekId(isoDate: string): string {
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
-/** 이번 주 월~금 뉴스 날짜 목록 (주간 인사이트 대상) */
-export function workWeekNewsDates(todayIso: string): string[] {
-  const d = parseIsoDate(todayIso);
+/** 이번 주 월~일(7일) 뉴스 날짜 목록 */
+export function weekNewsDates(isoDate: string): string[] {
+  const d = parseIsoDate(isoDate);
   const day = d.getUTCDay() || 7;
   const monday = new Date(d);
   monday.setUTCDate(d.getUTCDate() - (day - 1));
 
   const dates: string[] = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const cur = new Date(monday);
     cur.setUTCDate(monday.getUTCDate() + i);
     dates.push(cur.toISOString().slice(0, 10));
