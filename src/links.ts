@@ -1,6 +1,6 @@
 /** 마크다운 본문의 출처 링크 검증 — 할루시네이션 방지용 */
 
-import { splitNewsItems, isPlaceholderItem } from './newsItems.js';
+import { splitNewsItems, isPlaceholderItem, itemRequiresLink } from './newsItems.js';
 
 const LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
 
@@ -57,9 +57,7 @@ export function assertSourceLinks(md: string, label: string): void {
     return;
   }
 
-  const withoutLink = items.filter(
-    (item) => !isPlaceholderItem(item) && !/\[[^\]]+\]\(https?:\/\//.test(item)
-  );
+  const withoutLink = items.filter((item) => itemRequiresLink(item));
 
   if (withoutLink.length > 0) {
     throw new Error(

@@ -65,7 +65,9 @@ async function runWeekly(weekAnchorIso: string) {
 
   const prompt = weeklyInsightPrompt(runHuman, weekId, newsDates, dailyLogs);
   const content = await generateFromContext(
-    '너는 금융 리서치 애널리스트다. 제공된 일일 리서치 원문만 근거로 작성하고, 원문에 없는 사실을 추가하지 마라.',
+    '너는 금융 리서치 애널리스트다. 제공된 일일 리서치 원문만 근거로 작성한다. ' +
+      '주요 이슈는 팀 프로덕트 연관·다수 보도·파급효과 기준으로 선별하고, ' +
+      '프로덕트는 연관 있을 때만, 기술·규제·비즈니스 관점 중 해당하는 것만 작성한다.',
     prompt
   );
   assertSourceLinks(content, '주간 인사이트');

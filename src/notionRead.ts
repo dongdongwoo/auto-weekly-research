@@ -1,6 +1,7 @@
 import { config } from './config.js';
 import { notion } from './notion.js';
 import { isoWeekId, weekNewsDates } from './kst.js';
+import { isProductName } from './prompt.js';
 
 type NotionRichText = {
   plain_text?: string;
@@ -68,6 +69,13 @@ async function blockToMarkdownLines(
         }
         break;
       }
+      if (isProductName(title)) {
+        lines.push(`### ${title}`);
+        for (const child of await fetchAllBlocks(block.id)) {
+          lines.push(...(await blockToMarkdownLines(child, bulletDepth, ctx)));
+        }
+        break;
+      }
       if (ctx.inAxis) {
         lines.push(`### ${title}`);
         for (const child of await fetchAllBlocks(block.id)) {
@@ -108,11 +116,16 @@ async function blockToMarkdownLines(
       break;
     }
     case 'callout': {
-      const text = richTextToMarkdown((block.callout as { rich_text: NotionRichText[]; icon?: { emoji?: string } }).rich_text);
-      const emoji = (block.callout as { icon?: { emoji?: string } }).icon?.emoji;
-      if (text.trim()) {
-        lines.push(emoji === '🔭' ? `**전망** · ${text}` : `**분석** · ${text}`);
-      }
+      const node = block.callout as { rich_text: NotionRichText[]; icon?: { emoji?: string } };
+      const text = richTextToMarkdown(node.rich_text);
+      const emoji = node.icon?.emoji;
+      if (!text.trim()) break;
+      if (emoji === '🔭') lines.push(`**체크포인트** · ${text}`);
+      else if (emoji === '👀') lines.push(`**주시** · ${text}`);
+      else if (emoji === '🎯') lines.push(`**액션** · ${text}`);
+      else if (emoji === '🔗') lines.push(`**관찰** · ${text}`);
+      else if (emoji === '🧭') lines.push(`**해석** · ${text}`);
+      else lines.push(`**분석** · ${text}`);
       break;
     }
     case 'paragraph': {

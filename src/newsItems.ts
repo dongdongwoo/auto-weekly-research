@@ -26,6 +26,15 @@ export function isPlaceholderItem(item: string): boolean {
   return /해당 없음|신규 항목 없음|\(신규 없음\)/.test(item);
 }
 
+export function itemRequiresLink(item: string): boolean {
+  if (isPlaceholderItem(item)) return false;
+  if (/\[[^\]]+\]\(https?:\/\//.test(item)) return false;
+
+  const fields = item.match(/\*\*[^*]+\*\*\s*[·—]\s*(.+)/g) ?? [];
+  if (fields.length > 0 && fields.every((f) => /해당 없음/.test(f))) return false;
+  return true;
+}
+
 export function headlineFromItem(item: string): string | null {
   const h3 = item.match(/^### (.+)$/m);
   if (h3) return h3[1].replace(/^\[|\]$/g, '').trim();

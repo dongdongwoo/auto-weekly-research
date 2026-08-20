@@ -5,6 +5,7 @@
  * - **요약** / **분석** / **출처** → 문단·콜아웃
  */
 
+import { isProductName } from './prompt.js';
 import { normalizeDigestMarkdown } from './newsItems.js';
 
 type RichText = {
@@ -126,7 +127,7 @@ function labeledLineToBlock(text: string): NotionBlock {
     return callout(body, '💡');
   }
   if (/^\*\*출처\*\*/.test(trimmed) || /^출처\s*[·:]/.test(trimmed)) {
-    return paragraph(trimmed.replace(/^\*\*출처\*\*\s*[·—]?\s*/, '**🔗 출처** · '));
+    return paragraph(trimmed.replace(/^\*\*출처\*\*\s*[·—]?\s*/, '**출처** · '));
   }
   if (/^\*\*근거\*\*/.test(trimmed)) {
     return paragraph(trimmed.replace(/^\*\*근거\*\*\s*[·—]?\s*/, '**근거** · '));
@@ -134,14 +135,104 @@ function labeledLineToBlock(text: string): NotionBlock {
   if (/^\*\*전망\*\*/.test(trimmed)) {
     return callout(trimmed.replace(/^\*\*전망\*\*\s*[·—]?\s*/, ''), '🔭');
   }
+  if (/^\*\*사실\*\*/.test(trimmed) && /[·—]/.test(trimmed)) {
+    const body = trimmed.replace(/^\*\*사실\*\*\s*[·—]?\s*/, '');
+    return paragraph(`**사실**\n${body}`);
+  }
+  if (/^\*\*왜 주목\*\*/.test(trimmed) && /[·—]/.test(trimmed)) {
+    const body = trimmed.replace(/^\*\*왜 주목\*\*\s*[·—]?\s*/, '');
+    return paragraph(`**왜 주목**\n${body}`);
+  }
+  if (/^\*\*기술\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*기술\*\*\s*[·—]?\s*/, '**기술** · '));
+  }
+  if (/^\*\*규제\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*규제\*\*\s*[·—]?\s*/, '**규제** · '));
+  }
+  if (/^\*\*비즈니스\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*비즈니스\*\*\s*[·—]?\s*/, '**비즈니스** · '));
+  }
+  if (/^\*\*관찰\*\*/.test(trimmed)) {
+    const body = trimmed.replace(/^\*\*관찰\*\*\s*[·—]?\s*/, '');
+    return callout(body, '🔗');
+  }
+  if (/^\*\*해석\*\*/.test(trimmed)) {
+    const body = trimmed.replace(/^\*\*해석\*\*\s*[·—]?\s*/, '');
+    return callout(body, '🧭');
+  }
+  if (/^\*\*시사\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*시사\*\*\s*[·—]?\s*/, '**시사** · '));
+  }
+  if (/^\*\*트리거\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*트리거\*\*\s*[·—]?\s*/, '**트리거** · '));
+  }
+  if (/^\*\*체크포인트\*\*/.test(trimmed)) {
+    return callout(trimmed.replace(/^\*\*체크포인트\*\*\s*[·—]?\s*/, ''), '🔭');
+  }
+  if (/^\*\*주시\*\*/.test(trimmed)) {
+    return callout(trimmed.replace(/^\*\*주시\*\*\s*[·—]?\s*/, ''), '👀');
+  }
+  if (/^\*\*기회\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*기회\*\*\s*[·—]?\s*/, '**✅ 기회** · '));
+  }
+  if (/^\*\*리스크\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*리스크\*\*\s*[·—]?\s*/, '**⚠️ 리스크** · '));
+  }
+  if (/^\*\*액션\*\*/.test(trimmed)) {
+    const body = trimmed.replace(/^\*\*액션\*\*\s*[·—]?\s*/, '');
+    return callout(body, '🎯');
+  }
   if (/^\*\*내용\*\*/.test(trimmed) || /^\*\*시사점\*\*/.test(trimmed)) {
     return paragraph(trimmed);
   }
   return paragraph(trimmed);
 }
 
-/** ### 기사 → heading_3 + 요약/분석/출처 (Notion은 토글 2단까지만 허용) */
+function sectionLabel(text: string): NotionBlock {
+  return paragraph(`**${text}**`);
+}
+
+function isStandaloneLabel(text: string): '사실' | '왜 주목' | null {
+  const t = text.trim();
+  if (t === '**사실**' || t === '사실') return '사실';
+  if (t === '**왜 주목**' || t === '왜 주목') return '왜 주목';
+  return null;
+}
+
+/** 주간 주요 이슈 — 라벨(사실/왜 주목) + 본문 분리 */
+function weeklyIssueToBlocks(title: string, lines: MdLine[]): NotionBlock[] {
+  const cleanTitle = title.replace(/^\[|\]$/g, '').replace(/\*\*/g, '');
+  const blocks: NotionBlock[] = [heading3(cleanTitle)];
+  let i = 0;
+
+  while (i < lines.length) {
+    const label = isStandaloneLabel(lines[i].text);
+    if (label) {
+      blocks.push(sectionLabel(label));
+      i++;
+      const body: string[] = [];
+      while (i < lines.length) {
+        const next = lines[i].text.trim();
+        if (isStandaloneLabel(next) || /^\*\*출처\*\*/.test(next) || /^출처\s*[·:]/.test(next)) break;
+        body.push(lines[i].text.trim());
+        i++;
+      }
+      if (body.length) blocks.push(paragraph(body.join('\n')));
+      continue;
+    }
+    blocks.push(labeledLineToBlock(lines[i].text));
+    i++;
+  }
+  return blocks;
+}
+
+function isWeeklyIssueBlock(lines: MdLine[]): boolean {
+  return lines.some((l) => isStandaloneLabel(l.text) !== null);
+}
+
+/** ### 기사/이슈 → heading_3 + 본문 블록 */
 function newsItemToBlocks(title: string, lines: MdLine[]): NotionBlock[] {
+  if (isWeeklyIssueBlock(lines)) return weeklyIssueToBlocks(title, lines);
   const cleanTitle = title.replace(/^\[|\]$/g, '').replace(/\*\*/g, '');
   const blocks: NotionBlock[] = [heading3(cleanTitle)];
 
@@ -153,6 +244,43 @@ function newsItemToBlocks(title: string, lines: MdLine[]): NotionBlock[] {
     }
   }
   return blocks;
+}
+
+/** 프로덕트 라인 → 토글 (섹션은 heading_2, Notion 토글 2단 제한) */
+function productItemToToggle(title: string, lines: MdLine[]): NotionBlock {
+  const children: NotionBlock[] = [];
+  for (const line of lines) {
+    if (line.kind === 'paragraph' || line.kind === 'bullet') {
+      children.push(labeledLineToBlock(line.text));
+    }
+  }
+  return toggle(title.replace(/\*\*/g, ''), children);
+}
+
+function productSectionLinesToBlocks(lines: MdLine[]): NotionBlock[] {
+  const blocks: NotionBlock[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (lines[i].kind === 'h3' && isProductName(lines[i].text)) {
+      const title = lines[i].text;
+      const bodyLines: MdLine[] = [];
+      i++;
+      while (i < lines.length && !(lines[i].kind === 'h3' && isProductName(lines[i].text))) {
+        if (lines[i].kind === 'h3') break;
+        bodyLines.push(lines[i]);
+        i++;
+      }
+      if (bodyLines.length > 0) blocks.push(productItemToToggle(title, bodyLines));
+      continue;
+    }
+    i++;
+  }
+  return blocks;
+}
+
+function isProductSection(title: string): boolean {
+  return /담당 프로덕트/.test(title);
 }
 
 function toggle(title: string, children: NotionBlock[]): NotionBlock {
@@ -269,15 +397,16 @@ function isDocTitleSection(title: string): boolean {
   return /일일 리서치|주간 인사이트/.test(title);
 }
 
-function sectionToBlock(title: string, lines: MdLine[]): NotionBlock {
-  if (isDocTitleSection(title)) {
-    return heading2(title);
+function sectionToBlocks(title: string, lines: MdLine[]): NotionBlock[] {
+  if (isDocTitleSection(title)) return [heading2(title)];
+  if (isProductSection(title)) {
+    const products = productSectionLinesToBlocks(lines);
+    if (products.length === 0) return [heading2(title)];
+    return [heading2(title), ...products];
   }
   const body = sectionLinesToBlocks(lines);
-  if (body.length === 0) {
-    return heading2(title);
-  }
-  return toggle(title, body);
+  if (body.length === 0) return [heading2(title)];
+  return [toggle(title, body)];
 }
 
 function parseSections(md: string): { preamble: MdLine[]; sections: { title: string; lines: MdLine[] }[] } {
@@ -316,7 +445,7 @@ export function markdownToBlocks(md: string): NotionBlock[] {
   const blocks: NotionBlock[] = linesToBlocks(preamble);
 
   for (const { title, lines } of sections) {
-    blocks.push(sectionToBlock(title, lines));
+    blocks.push(...sectionToBlocks(title, lines));
   }
 
   return blocks;
