@@ -114,6 +114,24 @@ export const DASH_JS = `(function () {
     });
   }
 
+  function selectLatestWeekly() {
+    var list = document.querySelector('.panel-weekly .list');
+    if (!list) return;
+    var rows = [].slice.call(list.querySelectorAll('label.row'));
+    var shown = rows.filter(visible);
+    if (!shown[0]) return;
+    var inp = shown[0].querySelector('input[type="radio"]');
+    if (inp) inp.checked = true;
+  }
+
+  function clearSearchIfNeeded() {
+    var q = document.querySelector('[data-q]');
+    if (q && q.value) {
+      q.value = '';
+      applySearch();
+    }
+  }
+
   function scheduleAutoReload() {
     var shell = document.querySelector('.shell[data-generated-at]');
     if (!shell) return;
@@ -187,17 +205,22 @@ export const DASH_JS = `(function () {
   });
 
   document.addEventListener('click', function (e) {
-    var lab = e.target && e.target.closest && e.target.closest('.nav label, label.logo');
-    if (lab) {
-      var q = document.querySelector('[data-q]');
-      if (q && q.value) {
-        q.value = '';
-        applySearch();
-      }
+    var lab =
+      e.target &&
+      e.target.closest &&
+      e.target.closest('.nav label, label.logo, .overview-link, .overview-nav-btn');
+    if (!lab) return;
+    clearSearchIfNeeded();
+    if (lab.classList.contains('go-weekly-latest')) {
       requestAnimationFrame(function () {
-        requestAnimationFrame(syncChecked);
+        selectLatestWeekly();
+        syncChecked();
       });
+      return;
     }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(syncChecked);
+    });
   });
 
   if (document.readyState === 'loading') {

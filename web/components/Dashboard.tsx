@@ -140,7 +140,12 @@ export function Dashboard({
         </div>
 
         <section className="panel panel-home">
-          <OverviewPanel weekly={latest} stats={overviewStats} />
+          <OverviewPanel
+            weekly={latest}
+            stats={overviewStats}
+            weeklyTrend={data.weeklyTrend}
+            dailies={data.dailies}
+          />
         </section>
 
         <section className="panel panel-articles">

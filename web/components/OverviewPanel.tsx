@@ -1,4 +1,4 @@
-import type { WeeklyReport } from '@/lib/types';
+import type { DailyReport, WeeklyReport, WeeklyTrendReport } from '@/lib/types';
 import type { OverviewStats } from '@/lib/insights';
 import { DAILY_LLM_HINT, weeklyTrendHint } from '@/lib/trend-hints';
 import {
@@ -8,7 +8,7 @@ import {
   KpiGrid,
   MomentumBars,
   DailyTrendList,
-  TrendingStories,
+  TrendRankList,
 } from './OverviewCharts';
 import { TrendModals } from './TrendModals';
 
@@ -22,10 +22,25 @@ function confidenceClass(raw: string) {
 export function OverviewPanel({
   weekly,
   stats,
+  weeklyTrend,
+  dailies,
 }: {
   weekly: WeeklyReport | null;
   stats: OverviewStats;
+  weeklyTrend: WeeklyTrendReport | null;
+  dailies: DailyReport[];
 }) {
+  const windowStart = dailies
+    .map((d) => d.date)
+    .sort()
+    .slice(-stats.windowDays)[0];
+  const weeklyDailies = windowStart
+    ? dailies.filter((d) => d.date >= windowStart)
+    : dailies;
+  const dailyTarget = stats.dailyTrend?.targetDate;
+  const dailyDailies = dailyTarget
+    ? dailies.filter((d) => d.date === dailyTarget)
+    : dailies.slice(0, 1);
   return (
     <div className="overview">
       <header className="overview-hero">
@@ -44,7 +59,7 @@ export function OverviewPanel({
         </h2>
         <div className="overview-hero-links">
           {weekly?.updatedAt ? <span className="overview-stamp">{weekly.updatedAt}</span> : null}
-          <label className="overview-link" htmlFor="view-weekly">
+          <label className="overview-link go-weekly-latest" htmlFor="view-weekly">
             주간 상세 →
           </label>
         </div>
@@ -63,15 +78,20 @@ export function OverviewPanel({
         <section className="chart-card">
           <div className="chart-head">
             <h3 className="chart-title">주간 상위 언급 이슈</h3>
-            <span className="chart-sub">최근 {stats.windowDays}일 · 반복 보도 순</span>
+            <span className="chart-sub">
+              최근 {stats.windowDays}일
+              {weeklyTrend?.updatedAt ? ` · ${weeklyTrend.updatedAt.split('·')[0]?.trim()}` : ''}
+            </span>
           </div>
-          {stats.trendingWeekly.length === 0 ? (
-            <p className="pulse-empty">7일간 묶을 만한 반복 이슈가 없습니다</p>
-          ) : (
-            <TrendingStories
-              items={stats.trendingWeekly}
+          {weeklyTrend && weeklyTrend.items.length > 0 ? (
+            <TrendRankList
+              items={weeklyTrend.items}
+              updatedAt={weeklyTrend.updatedAt}
               hint={weeklyTrendHint(stats.windowDays)}
+              coverageOnly
             />
+          ) : (
+            <p className="pulse-empty">분석 중 · 1일마다 갱신</p>
           )}
         </section>
 
@@ -152,14 +172,16 @@ export function OverviewPanel({
         <label className="overview-nav-btn" htmlFor="view-daily">
           데일리 리포트
         </label>
-        <label className="overview-nav-btn primary" htmlFor="view-weekly">
+        <label className="overview-nav-btn primary go-weekly-latest" htmlFor="view-weekly">
           주간 인사이트
         </label>
       </nav>
 
       <TrendModals
-        weekly={stats.trendingWeekly}
+        weekly={weeklyTrend?.items ?? []}
         daily={stats.dailyTrend?.items ?? []}
+        weeklyDailies={weeklyDailies}
+        dailyDailies={dailyDailies}
       />
     </div>
   );

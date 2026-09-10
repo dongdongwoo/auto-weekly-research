@@ -111,6 +111,8 @@ export type DailyTrendReport = {
   items: DailyTrendItem[];
 };
 
+export type WeeklyTrendReport = DailyTrendReport;
+
 export type DashboardData = {
   hubTitle: string;
   generatedAt: string;
@@ -118,6 +120,7 @@ export type DashboardData = {
   dailies: DailyReport[];
   weeklies: WeeklyReport[];
   dailyTrend: DailyTrendReport | null;
+  weeklyTrend: WeeklyTrendReport | null;
   stats: {
     totalArticles: number;
     totalDailies: number;

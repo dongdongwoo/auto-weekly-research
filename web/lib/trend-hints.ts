@@ -1,5 +1,5 @@
 export function weeklyTrendHint(windowDays: number): string {
-  return `계산방식) 최근 ${windowDays}일 수집 기사를 묶어 기사·매체 많은 순`;
+  return `계산방식) 1일마다 LLM이 ${windowDays}일 보도 편수 추정`;
 }
 
 export const DAILY_LLM_HINT =

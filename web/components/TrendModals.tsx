@@ -1,66 +1,76 @@
-import type { DailyTrendItem } from '@/lib/types';
-import type { TrendingStory } from '@/lib/trending';
+import type { DailyReport, DailyTrendItem } from '@/lib/types';
+import { findRelatedArticles, type TrendArticleView } from '@/lib/trend-articles';
 import { SourceLinks } from './SourceLinks';
 
-function formatDay(iso: string) {
+function formatArticleDate(iso: string) {
   const [, m, d] = iso.split('-');
   return `${Number(m)}.${Number(d)}`;
 }
 
-function WeeklyModal({ story }: { story: TrendingStory }) {
+function TrendArticleBlock({ article }: { article: TrendArticleView }) {
   return (
-    <dialog className="trend-dialog" id={`trend-modal-${story.id}`}>
-      <div className="trend-dialog-inner">
-        <header className="trend-dialog-head">
-          <p className="trend-dialog-kicker">{story.axisLabel}</p>
-          <h3 className="trend-dialog-title">{story.headline}</h3>
-          <p className="trend-dialog-meta">
-            {story.articleCount}편 · {story.sourceCount}매체
-            {story.daySpan > 1 ? ` · ${story.daySpan}일` : ''}
-          </p>
-        </header>
-        <div className="trend-dialog-body">
-          {story.articles.map((a) => (
-            <article key={a.id} className="trend-dialog-article">
-              <p className="trend-dialog-article-meta">
-                {formatDay(a.date)} · {a.axis}
-              </p>
-              <h4 className="trend-dialog-article-title">{a.headline}</h4>
-              {a.summary ? <p className="trend-dialog-text">{a.summary}</p> : null}
-              {a.analysis ? <p className="trend-dialog-text muted">{a.analysis}</p> : null}
-              <SourceLinks sources={a.sources} />
-            </article>
-          ))}
+    <article className="trend-dialog-article">
+      <p className="trend-dialog-article-meta">
+        {formatArticleDate(article.date)} · {article.axis}
+      </p>
+      <h4 className="trend-dialog-article-title">{article.headline}</h4>
+      {article.summary ? <p className="trend-dialog-text">{article.summary}</p> : null}
+      {article.analysis ? (
+        <p className="trend-dialog-text muted">{article.analysis}</p>
+      ) : null}
+      {article.sources.length ? (
+        <div className="trend-dialog-refs">
+          <p className="trend-dialog-label">출처</p>
+          <SourceLinks sources={article.sources} />
         </div>
-        <footer className="trend-dialog-foot">
-          <button type="button" className="trend-dialog-close" data-trend-close>
-            닫기
-          </button>
-        </footer>
-      </div>
-    </dialog>
+      ) : null}
+    </article>
   );
 }
 
-function DailyModal({ item }: { item: DailyTrendItem }) {
+function TrendModal({
+  item,
+  showUp,
+  dailies,
+  dailyOnly,
+}: {
+  item: DailyTrendItem;
+  showUp: boolean;
+  dailies: DailyReport[];
+  dailyOnly?: boolean;
+}) {
+  const related = dailyOnly ? [] : findRelatedArticles(dailies, item);
+  const extraSources = dailyOnly
+    ? []
+    : related.length
+      ? item.sources.filter(
+          (s) => !related.some((a) => a.sources.some((as) => as.url === s.url)),
+        )
+      : item.sources;
+
   return (
     <dialog className="trend-dialog" id={`trend-modal-${item.id}`}>
       <div className="trend-dialog-inner">
         <header className="trend-dialog-head">
           <div className="trend-dialog-badges">
-            {item.rising ? <span className="trend-badge up">UP</span> : null}
+            {showUp && item.rising ? <span className="trend-badge up">UP</span> : null}
             <span className="trend-dialog-meta">
-              보도 {item.coverageCount}편 · SNS {item.mentionCount}회
+              {dailyOnly || showUp
+                ? `보도 ${item.coverageCount}편 · SNS ${item.mentionCount}회`
+                : `보도 ${item.coverageCount}편`}
             </span>
           </div>
           <h3 className="trend-dialog-title">{item.headline}</h3>
         </header>
         <div className="trend-dialog-body">
           {item.summary ? <p className="trend-dialog-text">{item.summary}</p> : null}
-          {item.sources.length ? (
+          {related.map((article) => (
+            <TrendArticleBlock key={article.id} article={article} />
+          ))}
+          {extraSources.length ? (
             <div className="trend-dialog-refs">
-              <p className="trend-dialog-label">근거</p>
-              <SourceLinks sources={item.sources} />
+              <p className="trend-dialog-label">{related.length ? '추가 근거' : '근거'}</p>
+              <SourceLinks sources={extraSources} />
             </div>
           ) : null}
         </div>
@@ -77,17 +87,27 @@ function DailyModal({ item }: { item: DailyTrendItem }) {
 export function TrendModals({
   weekly,
   daily,
+  weeklyDailies,
+  dailyDailies,
 }: {
-  weekly: TrendingStory[];
+  weekly: DailyTrendItem[];
   daily: DailyTrendItem[];
+  weeklyDailies: DailyReport[];
+  dailyDailies: DailyReport[];
 }) {
   return (
     <>
-      {weekly.map((s) => (
-        <WeeklyModal key={s.id} story={s} />
+      {weekly.map((item) => (
+        <TrendModal key={item.id} item={item} showUp={false} dailies={weeklyDailies} />
       ))}
       {daily.map((item) => (
-        <DailyModal key={item.id} item={item} />
+        <TrendModal
+          key={item.id}
+          item={item}
+          showUp
+          dailies={dailyDailies}
+          dailyOnly
+        />
       ))}
     </>
   );

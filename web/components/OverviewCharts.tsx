@@ -60,14 +60,18 @@ export function KpiGrid({
   );
 }
 
-export function DailyTrendList({
+export function TrendRankList({
   items,
   updatedAt,
   hint,
+  showUp = false,
+  coverageOnly = false,
 }: {
   items: DailyTrendItem[];
   updatedAt?: string;
   hint?: string;
+  showUp?: boolean;
+  coverageOnly?: boolean;
 }) {
   if (items.length === 0) return null;
 
@@ -86,9 +90,11 @@ export function DailyTrendList({
           <div className="trend-body">
             <p className="trend-meta">
               <span className="trend-stats">
-                보도 {item.coverageCount}편 · SNS {item.mentionCount}회
+                {coverageOnly
+                  ? `보도 ${item.coverageCount}편`
+                  : `보도 ${item.coverageCount}편 · SNS ${item.mentionCount}회`}
               </span>
-              {item.rising ? <span className="trend-badge up">UP</span> : null}
+              {showUp && item.rising ? <span className="trend-badge up">UP</span> : null}
             </p>
             <p className="trend-title">{item.headline}</p>
           </div>
@@ -97,6 +103,14 @@ export function DailyTrendList({
       {hint ? <p className="chart-legend-hint trend-calc">{hint}</p> : null}
     </div>
   );
+}
+
+export function DailyTrendList(props: {
+  items: DailyTrendItem[];
+  updatedAt?: string;
+  hint?: string;
+}) {
+  return <TrendRankList {...props} showUp />;
 }
 
 export function TrendingStories({

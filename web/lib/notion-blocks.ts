@@ -602,6 +602,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     dailies,
     weeklies,
     dailyTrend: null,
+    weeklyTrend: null,
     stats: {
       totalArticles,
       totalDailies: dailies.length,

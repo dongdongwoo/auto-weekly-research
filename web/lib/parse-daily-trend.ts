@@ -34,8 +34,11 @@ function readCounts(coverageRaw: string, mentionRaw: string, scoreRaw?: string) 
   return { coverageCount, mentionCount };
 }
 
-/** LLM 마크다운 응답 → DailyTrendReport */
-export function parseDailyTrendMarkdown(markdown: string): DailyTrendReport | null {
+/** LLM 마크다운 응답 → TrendReport */
+export function parseTrendMarkdown(
+  markdown: string,
+  idPrefix = 'dt',
+): DailyTrendReport | null {
   let updatedAt = '';
   let targetDate = '';
   let section = '';
@@ -54,7 +57,7 @@ export function parseDailyTrendMarkdown(markdown: string): DailyTrendReport | nu
       currentItem.score,
     );
     items.push({
-      id: `dt-${itemIdx++}`,
+      id: `${idPrefix}-${itemIdx++}`,
       headline: currentItem.title,
       score: compositeScore(coverageCount, mentionCount, rising),
       coverageCount,
@@ -69,7 +72,7 @@ export function parseDailyTrendMarkdown(markdown: string): DailyTrendReport | nu
   const detectSection = (title: string) => {
     flushItem();
     const t = title.replace(/\*\*/g, '').replace(/^##\s*/, '').trim();
-    if (/데일리 급등|급등 이슈/.test(t)) section = 'trending';
+    if (/데일리 급등|주간|상위 이슈|급등 이슈/.test(t)) section = 'trending';
     else if (/스냅샷/.test(t)) section = 'meta';
   };
 

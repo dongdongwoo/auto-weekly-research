@@ -19,12 +19,7 @@ import { assertSourceLinks } from './links.js';
 import { kstToday, kstHour, kstStamp, isoWeekId, weekNewsDates } from './kst.js';
 import { readWeekDaily, readWeekInsight } from './notionRead.js';
 import { ensureWeekPage } from './weekPage.js';
-import {
-  loadKnownItems,
-  stripDuplicates,
-  formatKnownForPrompt,
-  logKnownSummary,
-} from './dedup.js';
+import { loadKnownItems, stripDuplicates, formatKnownForPrompt, logKnownSummary } from './dedup.js';
 import { normalizeDigestMarkdown } from './newsItems.js';
 import { ensureAuth, config } from './config.js';
 
@@ -48,10 +43,12 @@ function hasNewArticles(content: string, remainingCount: number): boolean {
 async function collectDaily(
   newsIso: string,
   newsHuman: string,
-  mode: 'full' | 'incremental'
+  mode: 'full' | 'incremental',
 ): Promise<number> {
   const weekPageId = await ensureWeekPage(isoWeekId(newsIso), newsIso);
-  console.log(`📰 수집 대상: ${newsHuman} (${newsIso}) ${mode === 'incremental' ? '증분' : '하루 전체'}`);
+  console.log(
+    `📰 수집 대상: ${newsHuman} (${newsIso}) ${mode === 'incremental' ? '증분' : '하루 전체'}`,
+  );
 
   const known = await loadKnownItems(newsIso, config.dedupLookbackDays, true);
   logKnownSummary(known, newsIso);
@@ -99,7 +96,7 @@ async function refreshWeekly(weekAnchorIso: string, added: number, force = false
 
   console.log(
     `📂 주간 인사이트 입력: ${dailyLogs.length}일 (${dailyLogs.map((d) => d.iso).join(', ')})` +
-      (previous ? ' · 기존 초안 있음' : ' · 첫 작성')
+      (previous ? ' · 기존 초안 있음' : ' · 첫 작성'),
   );
 
   const stamp = kstStamp();
@@ -110,7 +107,7 @@ async function refreshWeekly(weekAnchorIso: string, added: number, force = false
   try {
     content = await generateVerified(
       WEEKLY_VERIFY_SYSTEM,
-      weeklyVerifyPrompt(stamp, weekId, draft, dailyLogs)
+      weeklyVerifyPrompt(stamp, weekId, draft, dailyLogs),
     );
   } catch (e) {
     console.warn(`⚠️ 검증 단계 실패 — 초안을 그대로 사용: ${e instanceof Error ? e.message : e}`);
