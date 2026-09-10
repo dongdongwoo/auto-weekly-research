@@ -1,9 +1,23 @@
-import { generateWithSearch, generateFromContext } from './claude.js';
-import { appendDigest, checkConnection } from './notion.js';
-import { dailyPrompt, weeklyInsightPrompt, monthlyPrompt } from './prompt.js';
+import { generateWithSearch, generateFromContext, generateVerified } from './claude.js';
+import {
+  appendDigest,
+  appendToDailyToggle,
+  ensureDailyToggle,
+  upsertWeeklyInsight,
+  checkConnection,
+} from './notion.js';
+import {
+  dailyPrompt,
+  hourlyDailyPrompt,
+  weeklyInsightPrompt,
+  weeklyVerifyPrompt,
+  monthlyPrompt,
+  WEEKLY_DRAFT_SYSTEM,
+  WEEKLY_VERIFY_SYSTEM,
+} from './prompt.js';
 import { assertSourceLinks } from './links.js';
-import { kstToday, kstYesterday, isoWeekId, isMondayKst, weekNewsDates } from './kst.js';
-import { readWeekDaily } from './notionRead.js';
+import { kstToday, kstHour, kstStamp, isoWeekId, weekNewsDates } from './kst.js';
+import { readWeekDaily, readWeekInsight } from './notionRead.js';
 import { ensureWeekPage } from './weekPage.js';
 import {
   loadKnownItems,
@@ -14,26 +28,39 @@ import {
 import { normalizeDigestMarkdown } from './newsItems.js';
 import { ensureAuth, config } from './config.js';
 
-type Mode = 'daily' | 'weekly' | 'morning' | 'monthly';
+type Mode = 'daily' | 'weekly' | 'morning' | 'monthly' | 'hourly';
 
 function parseMode(): Mode {
+  if (process.argv.includes('--hourly')) return 'hourly';
   if (process.argv.includes('--morning')) return 'morning';
   if (process.argv.includes('--weekly')) return 'weekly';
   if (process.argv.includes('--monthly')) return 'monthly';
   return 'daily';
 }
 
-/** 전날 뉴스 검색·분석 → 해당 주 Notion 페이지에 토글 */
-async function runDaily(weekPageId: string) {
-  const { human: runHuman } = kstToday();
-  const { iso: newsIso, human: newsHuman } = kstYesterday();
+function hasNewArticles(content: string, remainingCount: number): boolean {
+  if (remainingCount <= 0) return false;
+  if (/신규 항목 없음/.test(content) && remainingCount === 0) return false;
+  return true;
+}
 
-  console.log(`📰 수집 대상: ${newsHuman} (${newsIso}) 뉴스`);
+/** 지정일의 신규 뉴스 수집 → 해당 주 날짜 토글에 병합 */
+async function collectDaily(
+  newsIso: string,
+  newsHuman: string,
+  mode: 'full' | 'incremental'
+): Promise<number> {
+  const weekPageId = await ensureWeekPage(isoWeekId(newsIso), newsIso);
+  console.log(`📰 수집 대상: ${newsHuman} (${newsIso}) ${mode === 'incremental' ? '증분' : '하루 전체'}`);
 
-  const known = await loadKnownItems(newsIso, config.dedupLookbackDays);
-  logKnownSummary(known);
+  const known = await loadKnownItems(newsIso, config.dedupLookbackDays, true);
+  logKnownSummary(known, newsIso);
 
-  const prompt = dailyPrompt(runHuman, newsHuman, newsIso, formatKnownForPrompt(known));
+  const prompt =
+    mode === 'incremental'
+      ? hourlyDailyPrompt(kstStamp(), newsHuman, newsIso, formatKnownForPrompt(known, 80, newsIso))
+      : dailyPrompt(kstToday().human, newsHuman, newsIso, formatKnownForPrompt(known, 80, newsIso));
+
   const raw = await generateWithSearch(prompt);
   const normalized = normalizeDigestMarkdown(raw);
   const { content, removedCount, remainingCount } = stripDuplicates(normalized, known);
@@ -42,38 +69,61 @@ async function runDaily(weekPageId: string) {
     console.log(`🔄 중복 ${removedCount}건 제거, 신규 ${remainingCount}건`);
   }
 
-  assertSourceLinks(content, '일일 리서치');
+  if (!hasNewArticles(content, remainingCount)) {
+    console.log('📭 신규 기사 없음');
+    return 0;
+  }
 
-  await appendDigest(weekPageId, `📰 ${newsIso}`, content);
+  assertSourceLinks(content, mode === 'incremental' ? '시간별 수집' : '일일 리서치');
+  await appendToDailyToggle(weekPageId, newsIso, content);
+  return remainingCount;
 }
 
-/** 월~일 일일 리서치 → 주간 인사이트 토글 */
-async function runWeekly(weekAnchorIso: string) {
-  const { human: runHuman } = kstToday();
+/** 해당 주 일일 원문 → 초안 → 웹 검색 검증 → 주간 인사이트 토글 갱신 */
+async function refreshWeekly(weekAnchorIso: string, added: number, force = false): Promise<void> {
   const weekId = isoWeekId(weekAnchorIso);
   const weekPageId = await ensureWeekPage(weekId, weekAnchorIso);
   const newsDates = weekNewsDates(weekAnchorIso);
   const dailyLogs = await readWeekDaily(weekAnchorIso);
+  const previous = await readWeekInsight(weekAnchorIso);
 
   if (dailyLogs.length === 0) {
-    throw new Error(
-      `주간(${weekId}) 일일 리서치가 없습니다. npm run morning 을 먼저 실행하세요.`
-    );
+    console.log(`⏭️ 주간(${weekId}) 일일 리서치가 없어 인사이트를 건너뜁니다.`);
+    return;
   }
 
-  console.log(`📂 주간 인사이트 입력: ${dailyLogs.length}일 (${dailyLogs.map((d) => d.iso).join(', ')})`);
+  if (!force && added === 0 && previous) {
+    console.log(`⏭️ 신규 기사 없음 — ${weekId} 주간 인사이트 유지`);
+    return;
+  }
 
-  const prompt = weeklyInsightPrompt(runHuman, weekId, newsDates, dailyLogs);
-  const content = await generateFromContext(
-    '너는 금융 리서치 애널리스트다. 제공된 일일 리서치 원문만 근거로 작성한다. ' +
-      '주요 이슈는 팀 프로덕트 연관·다수 보도·파급효과 기준으로 선별하고, ' +
-      '프로덕트는 연관 있을 때만, 기술·규제·비즈니스 관점 중 해당하는 것만 작성한다.',
-    prompt
+  console.log(
+    `📂 주간 인사이트 입력: ${dailyLogs.length}일 (${dailyLogs.map((d) => d.iso).join(', ')})` +
+      (previous ? ' · 기존 초안 있음' : ' · 첫 작성')
   );
-  assertSourceLinks(content, '주간 인사이트');
 
-  await appendDigest(weekPageId, `📊 주간 인사이트 — 팀 공유용`, content);
-  console.log('\n💡 노션 주간 페이지에서 인사이트를 확인하고 팀에 공유하세요.');
+  const stamp = kstStamp();
+  const draftPrompt = weeklyInsightPrompt(stamp, weekId, newsDates, dailyLogs, previous);
+  const draft = await generateFromContext(WEEKLY_DRAFT_SYSTEM, draftPrompt);
+
+  let content: string;
+  try {
+    content = await generateVerified(
+      WEEKLY_VERIFY_SYSTEM,
+      weeklyVerifyPrompt(stamp, weekId, draft, dailyLogs)
+    );
+  } catch (e) {
+    console.warn(`⚠️ 검증 단계 실패 — 초안을 그대로 사용: ${e instanceof Error ? e.message : e}`);
+    content = draft;
+  }
+
+  if (!content.trim()) {
+    throw new Error('주간 인사이트 본문이 비어 있습니다.');
+  }
+
+  assertSourceLinks(content, '주간 인사이트');
+  await upsertWeeklyInsight(weekPageId, `📊 주간 인사이트 · ${stamp}`, content);
+  console.log('\n💡 대시보드·노션에서 갱신된 주간 인사이트를 확인하세요.');
 }
 
 async function runMonthly() {
@@ -84,30 +134,30 @@ async function runMonthly() {
   await appendDigest(config.notionPageId, `📚 ${iso} 월간 딥다이브`, content);
 }
 
-/** 매일: 전날 일일 + (월요일) 지난주 주간 인사이트 + 이번 주 페이지 생성 */
-async function runMorning() {
-  const monday = isMondayKst();
-  console.log(
-    monday
-      ? '🌅 오늘 월요일 — 일일(일요일) → 주간 인사이트 → 이번 주 페이지 순서로 실행'
-      : '🌅 일일 리서치만 실행 (주간 인사이트는 월요일 아침에 자동 실행)'
-  );
+/** 1시간마다: 오늘(KST) 증분 수집 + 이번 주 인사이트. 날짜가 바뀌면 새 데일리 토글을 연다 */
+async function runHourly() {
+  const stamp = kstStamp();
+  const today = kstToday();
+  const hour = kstHour();
+  console.log(`⏰ 시간별 업데이트 — ${stamp}`);
 
-  const { iso: newsIso } = kstYesterday();
-
-  // 전날(일요일) 뉴스는 해당 ISO 주(지난주) 페이지에 등록
-  const lastWeekPageId = await ensureWeekPage(isoWeekId(newsIso), newsIso);
-  await runDaily(lastWeekPageId);
-
-  if (isMondayKst()) {
-    console.log('\n📊 월요일 — 지난주 주간 인사이트 작성');
-    await runWeekly(newsIso);
-
-    const { iso: todayIso } = kstToday();
-    const thisWeekId = isoWeekId(todayIso);
-    console.log(`\n🗓️ 이번 주(${thisWeekId}) 페이지 생성 — 화요일부터 일일 리서치 등록`);
-    await ensureWeekPage(thisWeekId, todayIso);
+  const weekPageId = await ensureWeekPage(isoWeekId(today.iso), today.iso);
+  if (hour === 0) {
+    console.log(`🗓️ KST 00시 — 오늘 데일리 시작 📰 ${today.iso}`);
   }
+  await ensureDailyToggle(weekPageId, today.iso);
+
+  const added = await collectDaily(today.iso, today.human, 'incremental');
+  await refreshWeekly(today.iso, added);
+}
+
+/** 수동: 오늘 하루 전체 재수집 + 이번 주 인사이트 강제 갱신 */
+async function runMorning() {
+  const today = kstToday();
+  console.log(`🌅 오늘(${today.iso}) 전체 수집 후 주간 인사이트 갱신`);
+  await ensureDailyToggle(await ensureWeekPage(isoWeekId(today.iso), today.iso), today.iso);
+  const added = await collectDaily(today.iso, today.human, 'full');
+  await refreshWeekly(today.iso, added, true);
 }
 
 async function main() {
@@ -116,19 +166,21 @@ async function main() {
   await checkConnection();
 
   switch (mode) {
+    case 'hourly':
+      await runHourly();
+      break;
     case 'morning':
       await runMorning();
       break;
     case 'weekly':
-      await runWeekly(kstYesterday().iso);
+      await refreshWeekly(kstToday().iso, 0, true);
       break;
     case 'monthly':
       await runMonthly();
       break;
     default: {
-      const { iso: newsIso } = kstYesterday();
-      const weekPageId = await ensureWeekPage(isoWeekId(newsIso), newsIso);
-      await runDaily(weekPageId);
+      const today = kstToday();
+      await collectDaily(today.iso, today.human, 'full');
     }
   }
 }

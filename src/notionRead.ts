@@ -120,7 +120,8 @@ async function blockToMarkdownLines(
       const text = richTextToMarkdown(node.rich_text);
       const emoji = node.icon?.emoji;
       if (!text.trim()) break;
-      if (emoji === '🔭') lines.push(`**체크포인트** · ${text}`);
+      else if (emoji === '🔍') lines.push(`**교차검증** · ${text}`);
+      else if (emoji === '🔭') lines.push(`**체크포인트** · ${text}`);
       else if (emoji === '👀') lines.push(`**주시** · ${text}`);
       else if (emoji === '🎯') lines.push(`**액션** · ${text}`);
       else if (emoji === '🔗') lines.push(`**관찰** · ${text}`);
@@ -259,6 +260,24 @@ export async function fetchDailyLogsInRange(
 
   logs.sort((a, b) => a.iso.localeCompare(b.iso));
   return logs;
+}
+
+const WEEKLY_TOGGLE_RE = /주간 인사이트/;
+
+/** 해당 주 페이지의 주간 인사이트 원문 (없으면 null) */
+export async function readWeekInsight(weekAnchorIso: string): Promise<string | null> {
+  const weekId = isoWeekId(weekAnchorIso);
+  const pageId = await findWeekPageId(weekId);
+  if (!pageId) return null;
+
+  const blocks = await fetchAllBlocks(pageId);
+  for (const block of blocks) {
+    if (block.type !== 'toggle') continue;
+    if (!WEEKLY_TOGGLE_RE.test(toggleTitle(block))) continue;
+    const content = await blocksToMarkdown(block.id);
+    return content.length > 0 ? content : null;
+  }
+  return null;
 }
 
 export { cutoffIso };

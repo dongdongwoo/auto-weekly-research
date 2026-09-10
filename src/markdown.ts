@@ -172,6 +172,28 @@ function labeledLineToBlock(text: string): NotionBlock {
   if (/^\*\*주시\*\*/.test(trimmed)) {
     return callout(trimmed.replace(/^\*\*주시\*\*\s*[·—]?\s*/, ''), '👀');
   }
+  if (/^\*\*교차검증\*\*/.test(trimmed)) {
+    const body = trimmed.replace(/^\*\*교차검증\*\*\s*[·—]?\s*/, '');
+    return callout(body || trimmed, '🔍');
+  }
+  if (/^\*\*신뢰도\*\*/.test(trimmed) || /^\*\*신뢰도 총평\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*신뢰도( 총평)?\*\*\s*[·—]?\s*/, '**신뢰도** · '));
+  }
+  if (/^\*\*업데이트\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*업데이트\*\*\s*[·—]?\s*/, '**업데이트** · '));
+  }
+  if (/^\*\*기본\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*기본\*\*\s*[·—]?\s*/, '**기본** · '));
+  }
+  if (/^\*\*상방\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*상방\*\*\s*[·—]?\s*/, '**상방** · '));
+  }
+  if (/^\*\*하방\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*하방\*\*\s*[·—]?\s*/, '**하방** · '));
+  }
+  if (/^\*\*내용\*\*/.test(trimmed)) {
+    return paragraph(trimmed.replace(/^\*\*내용\*\*\s*[·—]?\s*/, '**내용** · '));
+  }
   if (/^\*\*기회\*\*/.test(trimmed)) {
     return paragraph(trimmed.replace(/^\*\*기회\*\*\s*[·—]?\s*/, '**✅ 기회** · '));
   }
@@ -192,11 +214,10 @@ function sectionLabel(text: string): NotionBlock {
   return paragraph(`**${text}**`);
 }
 
-function isStandaloneLabel(text: string): '사실' | '왜 주목' | null {
-  const t = text.trim();
-  if (t === '**사실**' || t === '사실') return '사실';
-  if (t === '**왜 주목**' || t === '왜 주목') return '왜 주목';
-  return null;
+function isStandaloneLabel(text: string): string | null {
+  const t = text.trim().replace(/\*\*/g, '');
+  const labels = ['사실', '왜 주목', '교차검증', '분석', '해석', '기본', '상방', '하방', '내용'];
+  return labels.includes(t) ? t : null;
 }
 
 /** 주간 주요 이슈 — 라벨(사실/왜 주목) + 본문 분리 */
@@ -213,7 +234,7 @@ function weeklyIssueToBlocks(title: string, lines: MdLine[]): NotionBlock[] {
       const body: string[] = [];
       while (i < lines.length) {
         const next = lines[i].text.trim();
-        if (isStandaloneLabel(next) || /^\*\*출처\*\*/.test(next) || /^출처\s*[·:]/.test(next)) break;
+        if (isStandaloneLabel(next) || /^\*\*출처\*\*/.test(next) || /^출처\s*[·:]/.test(next) || /^\*\*신뢰도\*\*/.test(next) || /^\*\*근거\*\*/.test(next)) break;
         body.push(lines[i].text.trim());
         i++;
       }

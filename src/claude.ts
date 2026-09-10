@@ -52,7 +52,7 @@ export async function generateWithSearch(prompt: string): Promise<string> {
   return text;
 }
 
-/** 웹 검색 없음 — 일일 원문만 근거로 주간 종합 */
+/** 웹 검색 없음 — 일일 원문만 근거로 주간 초안 */
 export async function generateFromContext(
   systemRules: string,
   userContent: string,
@@ -62,6 +62,20 @@ export async function generateFromContext(
   console.log('📝 Agent SDK — 일일 수집본 기반 작성 중...');
 
   const text = await runAgent(userContent, { webSearch: false, systemRules });
-  console.log(`✅ 작성 완료 (${text.length}자, 웹 검색 없음)`);
+  console.log(`✅ 초안 완료 (${text.length}자, 웹 검색 없음)`);
+  return text;
+}
+
+/** 웹 검색으로 초안 사실·수치 검증 후 최종본 */
+export async function generateVerified(
+  systemRules: string,
+  userContent: string,
+): Promise<string> {
+  warnIfAuthConflict();
+  console.log(`🤖 모델: ${config.model}`);
+  console.log('🔎 Agent SDK — 주간 인사이트 교차검증 중...');
+
+  const text = await runAgent(userContent, { webSearch: true, systemRules });
+  console.log(`✅ 검증 완료 (${text.length}자)`);
   return text;
 }

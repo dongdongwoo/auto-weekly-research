@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "hourly": "tsx src/index.ts --hourly",
     "collect": "tsx src/index.ts --daily",
     "weekly": "tsx src/index.ts --weekly",
     "morning": "tsx src/index.ts --morning",
     "digest:monthly": "tsx src/index.ts --monthly",
+    "test:dedup": "tsx src/dedup.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

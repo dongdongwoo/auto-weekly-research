@@ -14,11 +14,31 @@ export function kstToday(): { iso: string; human: string } {
   return formatKstDate(kstNow());
 }
 
-/** 수집 대상 = 전날 (매일 아침 7시 30분 실행 기준) */
+/** KST 기준 어제 */
 export function kstYesterday(): { iso: string; human: string } {
   const d = kstNow();
   d.setUTCDate(d.getUTCDate() - 1);
   return formatKstDate(d);
+}
+
+/** kstNow()는 UTC 인스턴스에 +9h를 더한 값 → getUTCHours()가 KST 시 */
+export function kstHour(): number {
+  return kstNow().getUTCHours();
+}
+
+/** 예: 2026-09-10 15:04 KST */
+export function kstStamp(): string {
+  const d = kstNow();
+  const { iso } = formatKstDate(d);
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${iso} ${hh}:${mm} KST`;
+}
+
+export function addIsoDays(iso: string, days: number): string {
+  const d = parseIsoDate(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 export function isMondayKst(): boolean {
