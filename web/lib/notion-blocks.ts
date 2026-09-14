@@ -59,7 +59,7 @@ function richTextToLinks(rich: NotionRichText[]): SourceLink[] {
 }
 
 const FIELD_LABELS =
-  '요약|분석|출처|사실|왜 주목|해석|주시|근거|기술|규제|비즈니스|교차검증|신뢰도 총평|신뢰도|업데이트|내용|기본|상방|하방|기회|리스크|액션|시사|점수|급등|보도|언급|조회|대상일';
+  '요약|분석|출처|사실|왜 주목|해석|주시|근거|기술|규제|비즈니스|교차검증|신뢰도 총평|신뢰도|업데이트|제목|내용|기본|상방|하방|기회|리스크|액션|시사|점수|급등|보도|언급|조회|대상일';
 
 function parseLabeledLine(text: string): { label: string; body: string } | null {
   const raw = text.replace(/\*\*/g, '').trim();
@@ -265,6 +265,7 @@ async function parseWeeklyToggle(
   weekTitle: string,
 ): Promise<WeeklyReport> {
   const blocks = await session.getAllBlocks(blockId);
+  let briefTitle = '';
   let headlineSummary = '';
   let updatedAt = '';
   let confidenceOverview = '';
@@ -373,8 +374,10 @@ async function parseWeeklyToggle(
       pendingLabel = null;
       const sources = parseSourcesFromText(labeled.body, rich);
       if (section === 'summary') {
-        if (labeled.label.includes('요약')) headlineSummary += labeled.body + ' ';
-        else if (labeled.label === '업데이트') updatedAt = labeled.body;
+        if (labeled.label === '제목') briefTitle = labeled.body;
+        else if (labeled.label === '내용' || labeled.label.includes('요약')) {
+          headlineSummary += labeled.body + ' ';
+        } else if (labeled.label === '업데이트') updatedAt = labeled.body;
         else if (labeled.label === '신뢰도' || labeled.label === '신뢰도 총평') {
           confidenceOverview = labeled.body;
         }
@@ -394,8 +397,10 @@ async function parseWeeklyToggle(
     if (pendingLabel) {
       const sources = parseSourcesFromText(text, rich);
       if (section === 'summary') {
-        if (pendingLabel === '업데이트') updatedAt = text;
+        if (pendingLabel === '제목') briefTitle = text;
+        else if (pendingLabel === '업데이트') updatedAt = text;
         else if (pendingLabel === '신뢰도' || pendingLabel === '신뢰도 총평') confidenceOverview = text;
+        else if (pendingLabel === '내용' || pendingLabel.includes('요약')) headlineSummary += text + ' ';
         else headlineSummary += text + ' ';
       } else if (currentItem) applyItemField(currentItem, pendingLabel, text, sources);
       else if (currentProduct) applyProductField(currentProduct, pendingLabel, text, sources);
@@ -491,6 +496,7 @@ async function parseWeeklyToggle(
 
   const searchText = [
     weekId,
+    briefTitle,
     headlineSummary,
     updatedAt,
     ...signals.flatMap((s) => [s.title, s.body]),
@@ -507,6 +513,7 @@ async function parseWeeklyToggle(
   return {
     weekId,
     weekTitle,
+    briefTitle: briefTitle.trim(),
     headlineSummary: headlineSummary.trim(),
     updatedAt,
     confidenceOverview,

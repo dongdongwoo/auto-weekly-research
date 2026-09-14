@@ -56,6 +56,14 @@ export function isoWeekId(isoDate: string): string {
 }
 
 /** 이번 주 월~일(7일) 뉴스 날짜 목록 */
+/** 지난주 월요일 (KST) ISO 날짜 */
+export function lastWeekMondayIso(): string {
+  const d = kstNow();
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - (day - 1) - 7);
+  return formatKstDate(d).iso;
+}
+
 export function weekNewsDates(isoDate: string): string[] {
   const d = parseIsoDate(isoDate);
   const day = d.getUTCDay() || 7;

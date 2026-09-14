@@ -1,6 +1,7 @@
 import type { DailyReport, WeeklyReport, WeeklyTrendReport } from '@/lib/types';
 import type { OverviewStats } from '@/lib/insights';
 import { DAILY_LLM_HINT, weeklyTrendHint } from '@/lib/trend-hints';
+import { splitWeeklyBrief } from '@/lib/weekly-brief';
 import {
   ArticleTimeline,
   AxisDonut,
@@ -41,6 +42,7 @@ export function OverviewPanel({
   const dailyDailies = dailyTarget
     ? dailies.filter((d) => d.date === dailyTarget)
     : dailies.slice(0, 1);
+  const weeklyBrief = splitWeeklyBrief(weekly);
   return (
     <div className="overview">
       <header className="overview-hero">
@@ -53,10 +55,9 @@ export function OverviewPanel({
           ) : null}
         </div>
         <h2 className="overview-headline">
-          {weekly?.headlineSummary ||
-            weekly?.issues[0]?.title ||
-            '주간 브리프가 생성되면 여기에 표시됩니다'}
+          {weeklyBrief.title || '주간 브리프가 생성되면 여기에 표시됩니다'}
         </h2>
+        {weeklyBrief.body ? <p className="overview-brief-body">{weeklyBrief.body}</p> : null}
         <div className="overview-hero-links">
           {weekly?.updatedAt ? <span className="overview-stamp">{weekly.updatedAt}</span> : null}
           <label className="overview-link go-weekly-latest" htmlFor="view-weekly">

@@ -469,7 +469,61 @@ export function markdownToBlocks(md: string): NotionBlock[] {
     blocks.push(...sectionToBlocks(title, lines));
   }
 
-  return blocks;
+  return prepareNotionBlocks(blocks);
+}
+
+/** Notion API: toggle·list item 등 자식 블록 최대 100개 */
+export const NOTION_CHILD_LIMIT = 90;
+
+function richTextPlain(rich: ReturnType<typeof toRichText>): string {
+  return rich.map((t) => t.text.content).join('');
+}
+
+function prepareListItem(block: NotionBlock): NotionBlock {
+  const type = block.type as string;
+  const node = block[type] as { rich_text?: unknown; children?: NotionBlock[] };
+  if (!node?.children?.length) return block;
+  const prepared = node.children.flatMap((c) => prepareBlock(c));
+  const capped = prepared.slice(0, NOTION_CHILD_LIMIT);
+  return { ...block, [type]: { ...node, children: capped } };
+}
+
+function prepareToggle(block: NotionBlock): NotionBlock[] {
+  const node = block.toggle as { rich_text: ReturnType<typeof toRichText>; children?: NotionBlock[] };
+  const prepared = (node.children ?? []).flatMap((c) => prepareBlock(c));
+  const title = richTextPlain(node.rich_text);
+
+  if (prepared.length <= NOTION_CHILD_LIMIT) {
+    return [
+      {
+        object: 'block',
+        type: 'toggle',
+        toggle: { rich_text: node.rich_text, children: prepared },
+      },
+    ];
+  }
+
+  const parts: NotionBlock[] = [];
+  const totalParts = Math.ceil(prepared.length / NOTION_CHILD_LIMIT);
+  for (let i = 0; i < prepared.length; i += NOTION_CHILD_LIMIT) {
+    const part = Math.floor(i / NOTION_CHILD_LIMIT) + 1;
+    const label = totalParts > 1 ? `${title} (${part}/${totalParts})` : title;
+    parts.push(toggle(label, prepared.slice(i, i + NOTION_CHILD_LIMIT)));
+  }
+  return parts;
+}
+
+function prepareBlock(block: NotionBlock): NotionBlock[] {
+  if (block.type === 'toggle') return prepareToggle(block);
+  if (block.type === 'bulleted_list_item' || block.type === 'numbered_list_item') {
+    return [prepareListItem(block)];
+  }
+  return [block];
+}
+
+/** 중첩 toggle/list 자식 수가 Notion 한도(100)를 넘지 않게 분할 */
+export function prepareNotionBlocks(blocks: NotionBlock[]): NotionBlock[] {
+  return blocks.flatMap((b) => prepareBlock(b));
 }
 
 /** 중첩 포함 블록 개수 (로깅용) */

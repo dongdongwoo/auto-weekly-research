@@ -76,6 +76,9 @@ export type WeeklyCaveat = {
 export type WeeklyReport = {
   weekId: string;
   weekTitle: string;
+  /** 이번 주 브리프 한 줄 제목 */
+  briefTitle: string;
+  /** 이번 주 브리프 본문 */
   headlineSummary: string;
   updatedAt: string;
   confidenceOverview: string;

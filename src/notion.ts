@@ -1,12 +1,18 @@
 import { Client } from '@notionhq/client';
 import { config } from './config.js';
-import { markdownToBlocks, toRichText, NotionBlock, countBlocks } from './markdown.js';
+import {
+  markdownToBlocks,
+  toRichText,
+  NotionBlock,
+  countBlocks,
+  NOTION_CHILD_LIMIT,
+} from './markdown.js';
 
 const notion = new Client({ auth: config.notionApiKey });
 
 export { notion };
 
-const CHUNK = 90;
+const CHUNK = NOTION_CHILD_LIMIT;
 
 /** 부모 페이지(NOTION_PAGE_ID) 아래 주간 하위 페이지 생성 */
 export async function createWeekPage(title: string): Promise<string> {

@@ -4,10 +4,12 @@ import { config, warnIfAuthConflict } from './config.js';
 type AgentRunOptions = {
   webSearch: boolean;
   systemRules?: string;
+  maxTurns?: number;
 };
 
 async function runAgent(prompt: string, opts: AgentRunOptions): Promise<string> {
   const fullPrompt = opts.systemRules ? `${opts.systemRules}\n\n---\n\n${prompt}` : prompt;
+  const maxTurns = opts.maxTurns ?? (opts.webSearch ? config.maxTurnsSearch : config.maxTurns);
 
   let result = '';
 
@@ -15,7 +17,7 @@ async function runAgent(prompt: string, opts: AgentRunOptions): Promise<string> 
     prompt: fullPrompt,
     options: {
       model: config.model,
-      maxTurns: config.maxTurns,
+      maxTurns,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       allowedTools: opts.webSearch ? ['WebSearch'] : [],
@@ -28,6 +30,11 @@ async function runAgent(prompt: string, opts: AgentRunOptions): Promise<string> 
     if (message.type === 'result') {
       if (message.subtype === 'success') {
         result = message.result;
+      } else if (message.subtype === 'error_max_turns') {
+        throw new Error(
+          `Agent 실행 실패: error_max_turns (한도 ${maxTurns}턴). ` +
+            'MAX_TURNS_SEARCH를 70~80으로 올리거나 npm run collect로 축소 수집 후 재시도하세요.',
+        );
       } else {
         throw new Error(`Agent 실행 실패: ${message.subtype}`);
       }
@@ -45,9 +52,9 @@ async function runAgent(prompt: string, opts: AgentRunOptions): Promise<string> 
 export async function generateWithSearch(prompt: string): Promise<string> {
   warnIfAuthConflict();
   console.log(`🤖 모델: ${config.model}`);
-  console.log('🔎 Agent SDK — 웹 검색으로 수집 중... (5~10분 소요)');
+  console.log(`🔎 Agent SDK — 웹 검색으로 수집 중... (최대 ${config.maxTurnsSearch}턴, 5~15분)`);
 
-  const text = await runAgent(prompt, { webSearch: true });
+  const text = await runAgent(prompt, { webSearch: true, maxTurns: config.maxTurnsSearch });
   console.log(`✅ 수집 완료 (${text.length}자)`);
   return text;
 }
@@ -73,9 +80,13 @@ export async function generateVerified(
 ): Promise<string> {
   warnIfAuthConflict();
   console.log(`🤖 모델: ${config.model}`);
-  console.log('🔎 Agent SDK — 주간 인사이트 교차검증 중...');
+  console.log(`🔎 Agent SDK — 주간 인사이트 교차검증 중... (최대 ${config.maxTurnsSearch}턴)`);
 
-  const text = await runAgent(userContent, { webSearch: true, systemRules });
+  const text = await runAgent(userContent, {
+    webSearch: true,
+    systemRules,
+    maxTurns: config.maxTurnsSearch,
+  });
   console.log(`✅ 검증 완료 (${text.length}자)`);
   return text;
 }

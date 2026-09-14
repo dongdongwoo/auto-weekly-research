@@ -16,7 +16,14 @@ import {
   WEEKLY_VERIFY_SYSTEM,
 } from './prompt.js';
 import { assertSourceLinks } from './links.js';
-import { kstToday, kstHour, kstStamp, isoWeekId, weekNewsDates } from './kst.js';
+import {
+  kstToday,
+  kstHour,
+  kstStamp,
+  isoWeekId,
+  weekNewsDates,
+  lastWeekMondayIso,
+} from './kst.js';
 import { readWeekDaily, readWeekInsight } from './notionRead.js';
 import { ensureWeekPage } from './weekPage.js';
 import { loadKnownItems, stripDuplicates, formatKnownForPrompt, logKnownSummary } from './dedup.js';
@@ -31,6 +38,25 @@ function parseMode(): Mode {
   if (process.argv.includes('--weekly')) return 'weekly';
   if (process.argv.includes('--monthly')) return 'monthly';
   return 'daily';
+}
+
+function parseFlagValue(flag: string): string | null {
+  const i = process.argv.indexOf(flag);
+  const v = i >= 0 ? process.argv[i + 1] : null;
+  if (!v || v.startsWith('--')) return null;
+  return v;
+}
+
+/** --date YYYY-MM-DD | --last-week → 주간 인사이트 대상 주 */
+function parseWeekAnchorIso(): string {
+  if (process.argv.includes('--last-week')) return lastWeekMondayIso();
+  const date = parseFlagValue('--date');
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  return kstToday().iso;
+}
+
+function parseFreshWeekly(): boolean {
+  return process.argv.includes('--fresh');
 }
 
 function hasNewArticles(content: string, remainingCount: number): boolean {
@@ -77,12 +103,17 @@ async function collectDaily(
 }
 
 /** 해당 주 일일 원문 → 초안 → 웹 검색 검증 → 주간 인사이트 토글 갱신 */
-async function refreshWeekly(weekAnchorIso: string, added: number, force = false): Promise<void> {
+async function refreshWeekly(
+  weekAnchorIso: string,
+  added: number,
+  force = false,
+  fresh = false,
+): Promise<void> {
   const weekId = isoWeekId(weekAnchorIso);
   const weekPageId = await ensureWeekPage(weekId, weekAnchorIso);
   const newsDates = weekNewsDates(weekAnchorIso);
   const dailyLogs = await readWeekDaily(weekAnchorIso);
-  const previous = await readWeekInsight(weekAnchorIso);
+  const previous = fresh ? null : await readWeekInsight(weekAnchorIso);
 
   if (dailyLogs.length === 0) {
     console.log(`⏭️ 주간(${weekId}) 일일 리서치가 없어 인사이트를 건너뜁니다.`);
@@ -169,9 +200,16 @@ async function main() {
     case 'morning':
       await runMorning();
       break;
-    case 'weekly':
-      await refreshWeekly(kstToday().iso, 0, true);
+    case 'weekly': {
+      const anchor = parseWeekAnchorIso();
+      const fresh = parseFreshWeekly();
+      const weekId = isoWeekId(anchor);
+      console.log(
+        `📊 주간 인사이트 재작성 — ${weekId} (기준일 ${anchor})${fresh ? ' · 초안 무시' : ''}`,
+      );
+      await refreshWeekly(anchor, 0, true, fresh);
       break;
+    }
     case 'monthly':
       await runMonthly();
       break;

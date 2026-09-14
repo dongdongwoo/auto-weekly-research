@@ -192,6 +192,14 @@ button, input, select { font: inherit; color: inherit; }
   line-height: 1.35;
   letter-spacing: -0.03em;
 }
+.overview-brief-body,
+.weekly-brief-body {
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 1.65;
+  color: #44403c;
+}
 .overview-hero-links {
   display: flex;
   align-items: center;

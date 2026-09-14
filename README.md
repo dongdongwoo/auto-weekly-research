@@ -16,7 +16,10 @@ npm run hourly         # 시간별 자동 실행용
 | ----------------- | ---- |
 | `npm run hourly`  | **자동 실행용.** 오늘 증분 수집 + (신규 있으면) 이번 주 인사이트 갱신. KST 00시면 새 데일리 토글 생성 |
 | `npm run collect` | 오늘 하루 전체 수집만 (수동) |
-| `npm run weekly`  | 이번 주 인사이트 강제 재작성 (수동) |
+| `npm run weekly`  | **이번 주** 인사이트 강제 재작성 |
+| `npm run weekly -- --last-week` | **지난주** 인사이트 재작성 |
+| `npm run weekly -- --date 2026-09-10` | 해당 날짜가 속한 주 재작성 |
+| `npm run weekly -- --last-week --fresh` | 지난주, **기존 초안 무시**하고 처음부터 |
 | `npm run morning` | 오늘 전체 수집 + 이번 주 인사이트 강제 갱신 (수동) |
 
 ## 스케줄 (GitHub Actions = `npm run hourly`)

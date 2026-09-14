@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { DashboardData, WeeklyReport, WeeklySignal } from '@/lib/types';
 import { buildOverviewStats } from '@/lib/insights';
+import { splitWeeklyBrief } from '@/lib/weekly-brief';
 import { ArticleDetail, ArticleRow } from './ArticleCard';
 import { OverviewPanel } from './OverviewPanel';
 import { SourceLinks } from './SourceLinks';
@@ -238,7 +239,9 @@ function WeeklyPanel({ weeklies }: { weeklies: WeeklyReport[] }) {
             <div className="empty">주간 인사이트는 기사가 쌓이면 시간마다 올라옵니다.</div>
           ) : (
             <div className="rows" data-sort-list="">
-              {weeklies.map((w, i) => (
+              {weeklies.map((w, i) => {
+                const brief = splitWeeklyBrief(w);
+                return (
                 <label
                   key={w.weekId}
                   className="row"
@@ -254,14 +257,19 @@ function WeeklyPanel({ weeklies }: { weeklies: WeeklyReport[] }) {
                     defaultChecked={i === 0}
                   />
                   <div className="meta">{w.updatedAt || w.weekId}</div>
-                  <div className="ttl">{w.issues[0]?.title || w.headlineSummary || '주간 인사이트'}</div>
+                  <div className="ttl">
+                    {brief.title || w.issues[0]?.title || '주간 인사이트'}
+                  </div>
                   <p className="peek">
-                    {w.headlineSummary
-                      ? w.headlineSummary.slice(0, 120)
-                      : `이슈 ${w.issues.length} · 시그널 ${w.signals.length}`}
+                    {brief.body
+                      ? brief.body.slice(0, 120)
+                      : w.headlineSummary
+                        ? w.headlineSummary.slice(0, 120)
+                        : `이슈 ${w.issues.length} · 시그널 ${w.signals.length}`}
                   </p>
                 </label>
-              ))}
+                );
+              })}
             </div>
           )}
         </aside>
@@ -322,10 +330,12 @@ function Fold({
 }
 
 function WeeklyDetail({ report }: { report: WeeklyReport }) {
+  const brief = splitWeeklyBrief(report);
   return (
     <article>
       <p className="kicker">{report.weekId}</p>
-      <h2>{report.headlineSummary || report.issues[0]?.title || '주간 브리프'}</h2>
+      <h2>{brief.title || report.issues[0]?.title || '주간 브리프'}</h2>
+      {brief.body ? <p className="weekly-brief-body">{brief.body}</p> : null}
       <div className="meta-row">
         {report.updatedAt ? <span>{report.updatedAt}</span> : null}
         {report.confidenceOverview ? (

@@ -37,7 +37,10 @@ export const config = {
   notionApiKey: required('NOTION_API_KEY'),
   notionPageId: required('NOTION_PAGE_ID'),
   model: process.env.CLAUDE_MODEL ?? 'claude-fable-5',
-  maxTurns: Number(process.env.MAX_TURNS ?? 30),
+  /** 컨텍스트만 (주간 초안 등) */
+  maxTurns: Number(process.env.MAX_TURNS ?? 25),
+  /** 웹 검색 수집·검증 — 턴 소진이 잦아 기본값을 높게 */
+  maxTurnsSearch: Number(process.env.MAX_TURNS_SEARCH ?? process.env.MAX_TURNS ?? 55),
   /** 중복 체크: 최근 1달(30일) */
   dedupLookbackDays: 30,
 };
