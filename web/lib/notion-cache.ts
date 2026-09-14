@@ -13,6 +13,7 @@ const CACHE_DIR = process.env.VERCEL
   ? path.join('/tmp', 'research-dashboard-cache')
   : path.join(process.cwd(), '.cache');
 const CACHE_FILE = path.join(CACHE_DIR, 'dashboard.json');
+const SNAPSHOT_FILE = path.join(process.cwd(), 'public', 'dashboard.snapshot.json');
 const IS_DEV = process.env.NODE_ENV === 'development';
 const IS_VERCEL = !!process.env.VERCEL;
 
@@ -28,10 +29,14 @@ let backgroundRefresh: Promise<void> | null = null;
 let rateLimitedUntil = 0;
 
 const getPlatformCached = unstable_cache(
-  async () => fetchDashboardData(),
+  async () => fetchDashboardData({ maxWeeks: vercelWeekLimit() }),
   ['notion-dashboard', String(VERSION)],
   { revalidate: REVALIDATE_SEC },
 );
+
+function vercelWeekLimit(): number {
+  return Math.max(1, Number(process.env.NOTION_MAX_WEEKS ?? 1));
+}
 
 function isFresh(entry: CacheEntry) {
   return entry.v === VERSION && Date.now() - entry.at < TTL_MS;
@@ -72,6 +77,17 @@ async function readDiskAny(): Promise<CacheEntry | null> {
   }
 }
 
+async function readBundledSnapshot(): Promise<DashboardData | null> {
+  try {
+    const raw = await fs.readFile(SNAPSHOT_FILE, 'utf8');
+    const parsed = JSON.parse(raw) as DashboardData;
+    if (!parsed.dailies || !parsed.weeklies) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 async function writeDisk(entry: CacheEntry) {
   try {
     await fs.mkdir(CACHE_DIR, { recursive: true });
@@ -88,26 +104,9 @@ function useStale(label: string, entry: CacheEntry) {
   return entry.data;
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('notion_fetch_timeout')), ms);
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
-}
-
 async function fetchNotionData(): Promise<DashboardData> {
-  const source = IS_VERCEL ? getPlatformCached() : fetchDashboardData();
-  if (!IS_VERCEL) return source;
-  return withTimeout(source, 9000);
+  if (!IS_VERCEL) return fetchDashboardData();
+  return getPlatformCached();
 }
 
 async function buildFromNotion(): Promise<DashboardData> {
@@ -140,12 +139,16 @@ async function loadDashboardProduction(): Promise<DashboardData> {
       if (cached?.v === VERSION) return useStale('rate limit', cached);
       if (staleDisk) return useStale('rate limit', staleDisk);
     }
-    if (staleDisk?.data) {
-      return useStale(
-        e instanceof Error && e.message === 'notion_fetch_timeout' ? 'timeout' : 'fetch failed',
-        staleDisk,
-      );
+    if (staleDisk?.data) return useStale('fetch failed', staleDisk);
+
+    const snapshot = await readBundledSnapshot();
+    if (snapshot) {
+      console.warn('Notion fetch 실패 — GHA 스냅샷 파일 사용');
+      const entry: CacheEntry = { data: snapshot, at: Date.now(), v: VERSION };
+      cached = entry;
+      return snapshot;
     }
+
     throw e;
   }
 }

@@ -6,6 +6,7 @@
   "scripts": {
     "hourly": "tsx src/index.ts --hourly",
     "trends": "tsx src/index.ts --trends",
+    "export:dashboard": "tsx web/scripts/export-dashboard.mts",
     "collect": "tsx src/index.ts --daily",
     "weekly": "tsx src/index.ts --weekly",
     "morning": "tsx src/index.ts --morning",

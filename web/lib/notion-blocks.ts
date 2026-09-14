@@ -543,7 +543,14 @@ async function parseTrendToggle(
   return parsed;
 }
 
-export async function fetchDashboardData(): Promise<DashboardData> {
+export type FetchDashboardOptions = {
+  maxWeeks?: number;
+};
+
+export async function fetchDashboardData(
+  opts: FetchDashboardOptions = {},
+): Promise<DashboardData> {
+  const weekLimit = opts.maxWeeks ?? maxWeeks();
   const session = getSession();
   const hubId = hubPageId();
 
@@ -575,7 +582,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   } while (cursor);
 
   weeks.sort((a, b) => b.weekId.localeCompare(a.weekId));
-  const weeksToLoad = weeks.slice(0, maxWeeks());
+  const weeksToLoad = weeks.slice(0, weekLimit);
 
   const dailies: DailyReport[] = [];
   const weeklies: WeeklyReport[] = [];

@@ -5,6 +5,6 @@
   "installCommand": "npm ci",
   "regions": ["icn1"],
   "env": {
-    "NOTION_MAX_WEEKS": "2"
+    "NOTION_MAX_WEEKS": "1"
   }
 }

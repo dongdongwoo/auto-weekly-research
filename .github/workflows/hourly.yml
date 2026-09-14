@@ -23,7 +23,7 @@ on:
           - trends
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: research-pipeline
@@ -66,3 +66,19 @@ jobs:
           CLAUDE_MODEL: claude-fable-5
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+
+      - name: Export dashboard snapshot (Vercel fallback)
+        if: steps.mode.outputs.value == 'hourly' || steps.mode.outputs.value == 'morning'
+        run: npm run export:dashboard
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+
+      - name: Push snapshot for redeploy
+        if: steps.mode.outputs.value == 'hourly' || steps.mode.outputs.value == 'morning'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/dashboard.snapshot.json
+          git diff --staged --quiet || git commit -m "chore: dashboard snapshot"
+          git push

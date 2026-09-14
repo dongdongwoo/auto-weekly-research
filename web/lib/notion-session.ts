@@ -7,7 +7,9 @@ type NotionBlock = {
   [key: string]: unknown;
 };
 
-const MIN_GAP_MS = Number(process.env.NOTION_MIN_GAP_MS ?? 500);
+const MIN_GAP_MS = Number(
+  process.env.NOTION_MIN_GAP_MS ?? (process.env.VERCEL ? 150 : 500),
+);
 const MAX_RETRIES = 5;
 
 function sleep(ms: number) {
