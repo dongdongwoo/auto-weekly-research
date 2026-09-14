@@ -6,7 +6,7 @@ import type { DashboardData } from './types';
 
 const TTL_MS = Number(process.env.NOTION_CACHE_SECONDS ?? 1800) * 1000;
 const STALE_MS = Number(process.env.NOTION_STALE_SECONDS ?? 86_400) * 1000;
-const VERSION = 14;
+const VERSION = 15;
 const CACHE_DIR = process.env.VERCEL
   ? path.join('/tmp', 'research-dashboard-cache')
   : path.join(process.cwd(), '.cache');

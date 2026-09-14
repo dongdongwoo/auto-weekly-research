@@ -2,7 +2,7 @@ import { compositeScore, parseCount, parsePct } from './viral-score';
 import type { DailyTrendItem, DailyTrendReport, SourceLink } from './types';
 
 const FIELD_LABELS =
-  '요약|출처|근거|업데이트|대상일|점수|급등|보도|언급|조회';
+  '요약|출처|근거|업데이트|대상일|대상|점수|급등|보도|언급|조회';
 
 function parseLabeledLine(text: string): { label: string; body: string } | null {
   const raw = text.replace(/\*\*/g, '').trim();
@@ -72,9 +72,12 @@ export function parseTrendMarkdown(
   const detectSection = (title: string) => {
     flushItem();
     const t = title.replace(/\*\*/g, '').replace(/^##\s*/, '').trim();
-    if (/데일리 급등|주간|상위 이슈|급등 이슈/.test(t)) section = 'trending';
-    else if (/스냅샷/.test(t)) section = 'meta';
+    if (/스냅샷/.test(t)) section = 'meta';
+    else if (/데일리 급등|주간|상위 이슈|급등 이슈/.test(t)) section = 'trending';
   };
+
+  const isSectionHeading = (title: string) =>
+    /스냅샷|급등 이슈|상위 이슈/.test(title);
 
   const startItem = (title: string) => {
     flushItem();
@@ -94,6 +97,10 @@ export function parseTrendMarkdown(
     const h3 = text.match(/^#{3}\s+(.+)/);
     if (h3) {
       const title = h3[1].replace(/\*\*/g, '').trim();
+      if (isSectionHeading(title)) {
+        detectSection(title);
+        return;
+      }
       if (section === 'trending' && title && !/^급등/.test(title)) startItem(title);
       return;
     }
@@ -103,7 +110,9 @@ export function parseTrendMarkdown(
       const sources = parseSourcesFromText(labeled.body);
       if (section === 'meta') {
         if (labeled.label === '업데이트') updatedAt = labeled.body;
-        else if (labeled.label === '대상일') targetDate = labeled.body.trim();
+        else if (labeled.label === '대상일' || labeled.label === '대상') {
+          targetDate = labeled.body.trim();
+        }
         return;
       }
       if (!currentItem) return;

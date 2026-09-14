@@ -4,7 +4,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: '주간 인사이트',
-  description: '시간별 갱신되는 일일·주간 리서치 대시보드',
+  description: 'GitHub Actions로 수집·분석하고 Notion에서 읽는 일일·주간 리서치 대시보드',
 };
 
 export const viewport: Viewport = {

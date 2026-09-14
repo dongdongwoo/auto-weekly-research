@@ -122,6 +122,7 @@ export const DASH_JS = `(function () {
     if (!shown[0]) return;
     var inp = shown[0].querySelector('input[type="radio"]');
     if (inp) inp.checked = true;
+    scrollDetailToTop('.panel-weekly');
   }
 
   function clearSearchIfNeeded() {
@@ -132,6 +133,7 @@ export const DASH_JS = `(function () {
     }
   }
 
+  /** Notion 캐시 TTL 만료 시 페이지 새로고침 (GHA→Notion 갱신분 반영) */
   function scheduleAutoReload() {
     var shell = document.querySelector('.shell[data-generated-at]');
     if (!shell) return;
@@ -169,12 +171,24 @@ export const DASH_JS = `(function () {
     if (shell) shell.classList.remove('mobile-detail-open');
   }
 
+  function scrollDetailToTop(panelSelector) {
+    var detail = document.querySelector(panelSelector + ' .detail');
+    if (detail) detail.scrollTop = 0;
+  }
+
   function bindMobileDetail() {
     document.addEventListener('click', function (e) {
       var row =
         e.target.closest &&
         e.target.closest('.panel-articles label.row, .panel-weekly label.row');
-      if (row && isMobileDetail()) openMobileDetail();
+      if (row && isMobileDetail()) {
+        if (row.closest('.panel-weekly')) {
+          requestAnimationFrame(function () {
+            scrollDetailToTop('.panel-weekly');
+          });
+        }
+        openMobileDetail();
+      }
     });
 
     document.querySelectorAll('[data-detail-back]').forEach(function (btn) {
@@ -236,6 +250,11 @@ export const DASH_JS = `(function () {
     if (t.getAttribute && t.getAttribute('data-axis-filter') != null) applyAxis();
     if (t.getAttribute && t.getAttribute('data-day') != null) applyDay(true);
     if (t.name === 'view') closeMobileDetail();
+    if (t.name === 'weekly-art') {
+      requestAnimationFrame(function () {
+        scrollDetailToTop('.panel-weekly');
+      });
+    }
     if (t.name === 'view' || t.name === 'daily-date') {
       requestAnimationFrame(function () {
         applyDay(false);

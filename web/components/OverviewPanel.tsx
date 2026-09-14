@@ -1,7 +1,7 @@
 import type { DailyReport, WeeklyReport, WeeklyTrendReport } from '@/lib/types';
 import type { OverviewStats } from '@/lib/insights';
-import { DAILY_LLM_HINT, weeklyTrendHint } from '@/lib/trend-hints';
-import { formatLastUpdated, updatedTimeOnly } from '@/lib/format-updated';
+import { DAILY_TREND_HINT, weeklyTrendHint } from '@/lib/trend-hints';
+import { updatedTimeOnly } from '@/lib/format-updated';
 import { splitWeeklyBrief } from '@/lib/weekly-brief';
 import {
   ArticleTimeline,
@@ -19,25 +19,24 @@ export function OverviewPanel({
   stats,
   weeklyTrend,
   dailies,
+  pipelineUpdated,
 }: {
   weekly: WeeklyReport | null;
   stats: OverviewStats;
   weeklyTrend: WeeklyTrendReport | null;
   dailies: DailyReport[];
+  pipelineUpdated: string | null;
 }) {
   const windowStart = dailies
     .map((d) => d.date)
     .sort()
     .slice(-stats.windowDays)[0];
-  const weeklyDailies = windowStart
-    ? dailies.filter((d) => d.date >= windowStart)
-    : dailies;
+  const weeklyDailies = windowStart ? dailies.filter((d) => d.date >= windowStart) : dailies;
   const dailyTarget = stats.dailyTrend?.targetDate;
   const dailyDailies = dailyTarget
     ? dailies.filter((d) => d.date === dailyTarget)
     : dailies.slice(0, 1);
   const weeklyBrief = splitWeeklyBrief(weekly);
-  const weeklyUpdated = formatLastUpdated(weekly?.updatedAt);
   const weeklyTrendTime = updatedTimeOnly(weeklyTrend?.updatedAt);
   const dailyTrendTime = updatedTimeOnly(stats.dailyTrend?.updatedAt);
   return (
@@ -57,7 +56,7 @@ export function OverviewPanel({
           </>
         ) : null}
         <div className="overview-hero-links">
-          {weeklyUpdated ? <span className="overview-stamp">{weeklyUpdated}</span> : null}
+          {pipelineUpdated ? <span className="overview-stamp">{pipelineUpdated}</span> : null}
           <label className="overview-link go-weekly-latest" htmlFor="view-weekly">
             주간 상세 →
           </label>
@@ -78,8 +77,7 @@ export function OverviewPanel({
           <div className="chart-head">
             <h3 className="chart-title">주간 상위 언급 이슈</h3>
             <span className="chart-sub">
-              최근 {stats.windowDays}일
-              {weeklyTrendTime ? ` · ${weeklyTrendTime}` : ''}
+              최근 {stats.windowDays}일{weeklyTrendTime ? ` · ${weeklyTrendTime}` : ''}
             </span>
           </div>
           {weeklyTrend && weeklyTrend.items.length > 0 ? (
@@ -90,7 +88,7 @@ export function OverviewPanel({
               coverageOnly
             />
           ) : (
-            <p className="pulse-empty">분석 중 · 1일마다 갱신</p>
+            <p className="pulse-empty">대기 중 · 매시 GHA가 Notion에 저장하면 반영</p>
           )}
         </section>
 
@@ -98,8 +96,7 @@ export function OverviewPanel({
           <div className="chart-head">
             <h3 className="chart-title">데일리 급등 이슈</h3>
             <span className="chart-sub">
-              오늘 {stats.dailyArticleCount}편
-              {dailyTrendTime ? ` · ${dailyTrendTime}` : ''}
+              오늘 {stats.dailyArticleCount}편{dailyTrendTime ? ` · ${dailyTrendTime}` : ''}
             </span>
           </div>
           {stats.dailyArticleCount === 0 ? (
@@ -108,10 +105,10 @@ export function OverviewPanel({
             <DailyTrendList
               items={stats.dailyTrend.items}
               updatedAt={stats.dailyTrend.updatedAt}
-              hint={DAILY_LLM_HINT}
+              hint={DAILY_TREND_HINT}
             />
           ) : (
-            <p className="pulse-empty">분석 중 · 캐시 갱신(30분) 후 표시</p>
+            <p className="pulse-empty">대기 중 · 신규 기사 수집 후 GHA가 Notion에 저장하면 반영</p>
           )}
         </section>
       </div>

@@ -23,7 +23,7 @@ export function dailyReportToMarkdown(daily: DailyReport): string {
   return lines.join('\n').trim();
 }
 
-/** 대시보드 30분 갱신 시 — 이미 수집된 오늘 기사만 LLM에 전달 */
+/** GHA 시간별 파이프라인 — 이미 수집된 오늘 기사만 LLM에 전달 */
 export function dailyTrendingPrompt(
   runStamp: string,
   newsDateIso: string,

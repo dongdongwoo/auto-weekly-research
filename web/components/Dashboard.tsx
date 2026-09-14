@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { DashboardData, WeeklyReport, WeeklySignal } from '@/lib/types';
 import { buildOverviewStats } from '@/lib/insights';
-import { formatLastUpdated, updatedTimeOnly } from '@/lib/format-updated';
+import { formatLastUpdated, formatPipelineUpdated, updatedTimeOnly } from '@/lib/format-updated';
 import { splitWeeklyBrief } from '@/lib/weekly-brief';
 import { ArticleDetail, ArticleRow } from './ArticleCard';
 import { OverviewPanel } from './OverviewPanel';
@@ -83,7 +83,7 @@ export function Dashboard({
   const articles = flattenArticles(data.dailies);
   const searching = initialQuery.trim().length > 0;
   const latest = data.weeklies[0] ?? null;
-  const lastUpdated = formatLastUpdated(latest?.updatedAt);
+  const pipelineUpdated = formatPipelineUpdated(data);
   const overviewStats = buildOverviewStats(articles, data.dailies, 7, data.dailyTrend);
 
   const css = [
@@ -130,7 +130,7 @@ export function Dashboard({
           <label className="logo" htmlFor="view-home">
             주간 인사이트
           </label>
-          {lastUpdated ? <p className="stamp stamp-header">{lastUpdated}</p> : null}
+          {pipelineUpdated ? <p className="stamp stamp-header">{pipelineUpdated}</p> : null}
         </div>
         <nav className="nav" aria-label="보기 전환">
           <label htmlFor="view-home">대시보드</label>
@@ -160,6 +160,7 @@ export function Dashboard({
             stats={overviewStats}
             weeklyTrend={data.weeklyTrend}
             dailies={data.dailies}
+            pipelineUpdated={pipelineUpdated}
           />
         </section>
 
@@ -251,7 +252,7 @@ function WeeklyPanel({ weeklies }: { weeklies: WeeklyReport[] }) {
       <div className="split">
         <aside className="list">
           {weeklies.length === 0 ? (
-            <div className="empty">주간 인사이트는 기사가 쌓이면 시간마다 올라옵니다.</div>
+            <div className="empty">주간 인사이트는 KST 09:00에 갱신됩니다.</div>
           ) : (
             <div className="rows" data-sort-list="">
               {weeklies.map((w, i) => {
@@ -271,9 +272,12 @@ function WeeklyPanel({ weeklies }: { weeklies: WeeklyReport[] }) {
                     id={`w-art-${sid(w.weekId)}`}
                     defaultChecked={i === 0}
                   />
-                  <div className="meta">{updatedTimeOnly(w.updatedAt) ?? w.weekId}</div>
+                  <div className="meta">
+                    {w.weekId}
+                    {updatedTimeOnly(w.updatedAt) ? ` · ${updatedTimeOnly(w.updatedAt)}` : ''}
+                  </div>
                   <div className="ttl">
-                    {brief.title || w.issues[0]?.title || '주간 인사이트'}
+                    {brief.title || w.issues[0]?.title || '주간 브리프'}
                   </div>
                   <p className="peek">
                     {brief.body

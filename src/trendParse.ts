@@ -85,9 +85,12 @@ export function parseTrendMarkdown(markdown: string, idPrefix = 'dt'): TrendRepo
   const detectSection = (title: string) => {
     flushItem();
     const t = title.replace(/\*\*/g, '').replace(/^##\s*/, '').trim();
-    if (/데일리 급등|주간|상위 이슈|급등 이슈/.test(t)) section = 'trending';
-    else if (/스냅샷/.test(t)) section = 'meta';
+    if (/스냅샷/.test(t)) section = 'meta';
+    else if (/데일리 급등|주간|상위 이슈|급등 이슈/.test(t)) section = 'trending';
   };
+
+  const isSectionHeading = (title: string) =>
+    /스냅샷|급등 이슈|상위 이슈/.test(title);
 
   const startItem = (title: string) => {
     flushItem();
@@ -107,6 +110,10 @@ export function parseTrendMarkdown(markdown: string, idPrefix = 'dt'): TrendRepo
     const h3 = text.match(/^#{3}\s+(.+)/);
     if (h3) {
       const title = h3[1].replace(/\*\*/g, '').trim();
+      if (isSectionHeading(title)) {
+        detectSection(title);
+        return;
+      }
       if (section === 'trending' && title && !/^급등/.test(title)) startItem(title);
       return;
     }
