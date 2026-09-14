@@ -1,7 +1,10 @@
 import { getNotionSession, type NotionBlock, type NotionSession } from './notion-session';
+import { toggleBlocksToMarkdown } from './notion-markdown';
+import { parseTrendMarkdown } from './parse-daily-trend';
 import type {
   Article,
   DailyReport,
+  DailyTrendReport,
   DashboardData,
   ProductInsight,
   SourceLink,
@@ -12,11 +15,14 @@ import type {
   WeeklyReport,
   WeeklySignal,
   WeeklyTheme,
+  WeeklyTrendReport,
 } from './types';
 
 const WEEK_PAGE_RE = /📊\s+(20\d\d-W\d{2})/;
 const DATE_TOGGLE_RE = /📰\s*(\d{4}-\d{2}-\d{2})/;
 const WEEKLY_TOGGLE_RE = /주간 인사이트/;
+const DAILY_TREND_RE = /📈\s*데일리\s*급등(?:\s*·\s*(\d{4}-\d{2}-\d{2}))?/;
+const WEEKLY_TREND_RE = /📈\s*주간\s*상위(?:\s*·\s*(20\d\d-W\d{2}))?/;
 
 type NotionRichText = {
   plain_text?: string;
@@ -524,6 +530,18 @@ async function parseWeeklyToggle(
   };
 }
 
+async function parseTrendToggle(
+  session: NotionSession,
+  blockId: string,
+  idPrefix: string,
+): Promise<DailyTrendReport | null> {
+  const markdown = await toggleBlocksToMarkdown(session, blockId);
+  if (!markdown) return null;
+  const parsed = parseTrendMarkdown(markdown, idPrefix);
+  if (!parsed) return null;
+  return parsed;
+}
+
 export async function fetchDashboardData(): Promise<DashboardData> {
   const session = getSession();
   const hubId = hubPageId();
@@ -560,12 +578,47 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   const dailies: DailyReport[] = [];
   const weeklies: WeeklyReport[] = [];
+  let dailyTrend: DailyTrendReport | null = null;
+  let weeklyTrend: WeeklyTrendReport | null = null;
+  let bestDailyDate = '';
+  let bestWeeklyId = '';
 
   for (const week of weeksToLoad) {
     const blocks = await session.getAllBlocks(week.id);
     for (const block of blocks) {
       if (block.type !== 'toggle') continue;
       const title = toggleTitle(block);
+
+      const dailyTrendMatch = title.match(DAILY_TREND_RE);
+      if (dailyTrendMatch) {
+        const trendDate = dailyTrendMatch[1] ?? '';
+        if (!dailyTrend || trendDate >= bestDailyDate) {
+          const parsed = await parseTrendToggle(session, block.id, 'dt');
+          if (parsed?.items.length || parsed?.updatedAt) {
+            dailyTrend = parsed;
+            bestDailyDate = trendDate;
+          }
+        }
+        continue;
+      }
+
+      const weeklyTrendMatch = title.match(WEEKLY_TREND_RE);
+      if (weeklyTrendMatch) {
+        const trendWeek = weeklyTrendMatch[1] ?? week.weekId;
+        if (!weeklyTrend || trendWeek >= bestWeeklyId) {
+          const parsed = await parseTrendToggle(session, block.id, 'wt');
+          if (parsed?.items.length || parsed?.updatedAt) {
+            weeklyTrend = {
+              ...parsed,
+              items: parsed.items
+                .map((item) => ({ ...item, mentionCount: 0 }))
+                .sort((a, b) => b.coverageCount - a.coverageCount || b.score - a.score),
+            };
+            bestWeeklyId = trendWeek;
+          }
+        }
+        continue;
+      }
 
       const dateMatch = title.match(DATE_TOGGLE_RE);
       if (dateMatch) {
@@ -597,6 +650,10 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   dailies.sort((a, b) => b.date.localeCompare(a.date));
   weeklies.sort((a, b) => b.weekId.localeCompare(a.weekId));
 
+  if (dailyTrend && !dailyTrend.targetDate && dailies[0]) {
+    dailyTrend = { ...dailyTrend, targetDate: dailies[0].date };
+  }
+
   const totalArticles = dailies.reduce((n, d) => n + d.articleCount, 0);
 
   return {
@@ -605,8 +662,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     weeks,
     dailies,
     weeklies,
-    dailyTrend: null,
-    weeklyTrend: null,
+    dailyTrend,
+    weeklyTrend,
     stats: {
       totalArticles,
       totalDailies: dailies.length,

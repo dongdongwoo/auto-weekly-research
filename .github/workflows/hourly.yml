@@ -1,23 +1,36 @@
-name: Hourly Research
+name: Research Pipeline
 
-# 매시 KST 정각 (UTC cron 0 * * * * → KST도 매시 00분).
-# KST 00:00 = UTC 15:00 — 새 날짜 데일리 토글을 열고 오늘 분 수집을 시작한다.
-# --daily / --weekly / --morning 은 수동용
+# 스케줄 (모두 UTC)
+# · 매시 정각 — 증분 수집 + 트렌드 스냅샷 (KST 매시 00분)
+# · KST 09:00 = UTC 00:00 — 같은 실행에서 주간 인사이트도 갱신
+#
+# 수동 실행(workflow_dispatch)으로 mode 선택 가능
 
 on:
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드'
+        required: true
+        default: hourly
+        type: choice
+        options:
+          - hourly
+          - morning
+          - weekly
+          - trends
 
 permissions:
   contents: read
 
 concurrency:
-  group: hourly-research
+  group: research-pipeline
   cancel-in-progress: false
 
 jobs:
-  hourly:
+  run:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -29,7 +42,25 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run hourly
+
+      - name: Resolve mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=hourly" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run pipeline
+        run: |
+          case "${{ steps.mode.outputs.value }}" in
+            hourly)  npm run hourly ;;
+            morning) npm run morning ;;
+            weekly)  npm run weekly ;;
+            trends)  npm run trends ;;
+            *) echo "Unknown mode"; exit 1 ;;
+          esac
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           CLAUDE_MODEL: claude-fable-5

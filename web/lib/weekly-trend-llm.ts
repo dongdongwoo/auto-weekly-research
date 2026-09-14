@@ -9,7 +9,7 @@ export async function analyzeWeeklyTrend(
   windowDays = 7,
 ): Promise<WeeklyTrendReport | null> {
   if (!hasLlmAuth()) {
-    console.warn('주간 상위 LLM — CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY 없음, 건너뜀');
+    console.warn('주간 상위 LLM — CLAUDE_CODE_OAUTH_TOKEN 없음, 건너뜀');
     return null;
   }
 

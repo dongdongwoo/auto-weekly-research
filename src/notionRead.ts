@@ -264,6 +264,21 @@ export async function fetchDailyLogsInRange(
 
 const WEEKLY_TOGGLE_RE = /주간 인사이트/;
 
+/** 주간 페이지에서 제목 패턴에 맞는 토글 원문 (없으면 null) */
+export async function readNamedToggle(
+  weekPageId: string,
+  titlePattern: RegExp,
+): Promise<string | null> {
+  const blocks = await fetchAllBlocks(weekPageId);
+  for (const block of blocks) {
+    if (block.type !== 'toggle') continue;
+    if (!titlePattern.test(toggleTitle(block))) continue;
+    const content = await blocksToMarkdown(block.id);
+    return content.length > 0 ? content : null;
+  }
+  return null;
+}
+
 /** 해당 주 페이지의 주간 인사이트 원문 (없으면 null) */
 export async function readWeekInsight(weekAnchorIso: string): Promise<string | null> {
   const weekId = isoWeekId(weekAnchorIso);

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "hourly": "tsx src/index.ts --hourly",
+    "trends": "tsx src/index.ts --trends",
     "collect": "tsx src/index.ts --daily",
     "weekly": "tsx src/index.ts --weekly",
     "morning": "tsx src/index.ts --morning",

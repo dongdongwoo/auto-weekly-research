@@ -25,18 +25,20 @@ import {
   lastWeekMondayIso,
 } from './kst.js';
 import { readWeekDaily, readWeekInsight } from './notionRead.js';
+import { refreshTrendSnapshots } from './trends.js';
 import { ensureWeekPage } from './weekPage.js';
 import { loadKnownItems, stripDuplicates, formatKnownForPrompt, logKnownSummary } from './dedup.js';
 import { normalizeDigestMarkdown } from './newsItems.js';
 import { ensureAuth, config } from './config.js';
 
-type Mode = 'daily' | 'weekly' | 'morning' | 'monthly' | 'hourly';
+type Mode = 'daily' | 'weekly' | 'morning' | 'monthly' | 'hourly' | 'trends';
 
 function parseMode(): Mode {
   if (process.argv.includes('--hourly')) return 'hourly';
   if (process.argv.includes('--morning')) return 'morning';
   if (process.argv.includes('--weekly')) return 'weekly';
   if (process.argv.includes('--monthly')) return 'monthly';
+  if (process.argv.includes('--trends')) return 'trends';
   return 'daily';
 }
 
@@ -162,7 +164,7 @@ async function runMonthly() {
   await appendDigest(config.notionPageId, `📚 ${iso} 월간 딥다이브`, content);
 }
 
-/** 1시간마다: 오늘(KST) 증분 수집 + 이번 주 인사이트. 날짜가 바뀌면 새 데일리 토글을 연다 */
+/** 1시간마다: 오늘(KST) 증분 수집 → 트렌드 스냅샷. 주간 인사이트는 KST 09:00만 */
 async function runHourly() {
   const stamp = kstStamp();
   const today = kstToday();
@@ -176,16 +178,34 @@ async function runHourly() {
   await ensureDailyToggle(weekPageId, today.iso);
 
   const added = await collectDaily(today.iso, today.human, 'incremental');
-  await refreshWeekly(today.iso, added);
+  await refreshTrendSnapshots(weekPageId, today.iso, { added, hour });
+
+  if (hour === 9) {
+    console.log('📊 KST 09:00 — 주간 인사이트 갱신');
+    await refreshWeekly(today.iso, added, true);
+  } else {
+    console.log(`⏭️ 주간 인사이트 — KST 09:00에만 갱신 (현재 ${hour}시)`);
+  }
 }
 
-/** 수동: 오늘 하루 전체 재수집 + 이번 주 인사이트 강제 갱신 */
+/** 수동: 오늘 하루 전체 재수집 + 트렌드 + 주간 인사이트 강제 갱신 */
 async function runMorning() {
   const today = kstToday();
-  console.log(`🌅 오늘(${today.iso}) 전체 수집 후 주간 인사이트 갱신`);
-  await ensureDailyToggle(await ensureWeekPage(isoWeekId(today.iso), today.iso), today.iso);
+  console.log(`🌅 오늘(${today.iso}) 전체 수집 후 트렌드·주간 인사이트 갱신`);
+  const weekPageId = await ensureWeekPage(isoWeekId(today.iso), today.iso);
+  await ensureDailyToggle(weekPageId, today.iso);
   const added = await collectDaily(today.iso, today.human, 'full');
+  await refreshTrendSnapshots(weekPageId, today.iso, { added, force: true });
   await refreshWeekly(today.iso, added, true);
+}
+
+/** 수동: 트렌드 스냅샷만 갱신 (수집 없음) */
+async function runTrendsOnly() {
+  const today = kstToday();
+  const hour = kstHour();
+  console.log(`📈 트렌드 스냅샷 갱신 — ${today.iso}`);
+  const weekPageId = await ensureWeekPage(isoWeekId(today.iso), today.iso);
+  await refreshTrendSnapshots(weekPageId, today.iso, { force: true, hour });
 }
 
 async function main() {
@@ -199,6 +219,9 @@ async function main() {
       break;
     case 'morning':
       await runMorning();
+      break;
+    case 'trends':
+      await runTrendsOnly();
       break;
     case 'weekly': {
       const anchor = parseWeekAnchorIso();

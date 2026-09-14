@@ -26,7 +26,7 @@ export async function createWeekPage(title: string): Promise<string> {
         object: 'block',
         type: 'callout',
         callout: {
-          rich_text: toRichText('**일일 리서치**는 KST 자정에 날짜 토글이 생기고, 이후 1시간마다 오늘 분이 쌓입니다. **주간 인사이트**도 같은 주기로 갱신됩니다 (대시보드가 주 열람 화면).') as any,
+          rich_text: toRichText('**일일 리서치**는 KST 자정에 날짜 토글이 생기고, 1시간마다 오늘 분이 쌓입니다. **데일리/주간 급등**은 수집 직후 GHA에서 갱신하고, **주간 인사이트**는 KST 09:00에 갱신됩니다.') as any,
           icon: { type: 'emoji', emoji: '📌' },
         },
       } as any,
@@ -112,28 +112,38 @@ async function replaceToggleChildren(toggleId: string, children: NotionBlock[]):
   await appendChildren(toggleId, children);
 }
 
-/** 주간 인사이트 토글 — 있으면 내용 교체, 없으면 추가 */
-export async function upsertWeeklyInsight(
+/** 제목 패턴으로 토글 찾아 내용 교체 — 주간 인사이트·트렌드 스냅샷 공용 */
+export async function upsertNamedToggle(
   pageId: string,
   title: string,
-  digestMarkdown: string
+  digestMarkdown: string,
+  titlePattern: RegExp,
 ): Promise<void> {
   const children = markdownToBlocks(digestMarkdown);
   const blocks = await listChildBlocks(pageId);
-  const existing = blocks.find((b) => b.type === 'toggle' && /주간 인사이트/.test(richTextPlain(b)));
+  const existing = blocks.find((b) => b.type === 'toggle' && titlePattern.test(richTextPlain(b)));
 
   if (!existing) {
     await appendDigest(pageId, title, digestMarkdown);
     return;
   }
 
-  console.log(`📝 노션 주간 인사이트 갱신: "${title}"`);
+  console.log(`📝 노션 토글 갱신: "${title}"`);
   await notion.blocks.update({
     block_id: existing.id,
     toggle: { rich_text: toRichText(`**${title}**`) as any },
   } as any);
   await replaceToggleChildren(existing.id, children);
-  console.log(`✅ 주간 인사이트 갱신 완료 (블록 ${countBlocks(children)}개)`);
+  console.log(`✅ 토글 갱신 완료 (블록 ${countBlocks(children)}개)`);
+}
+
+/** 주간 인사이트 토글 — 있으면 내용 교체, 없으면 추가 */
+export async function upsertWeeklyInsight(
+  pageId: string,
+  title: string,
+  digestMarkdown: string
+): Promise<void> {
+  await upsertNamedToggle(pageId, title, digestMarkdown, /주간 인사이트/);
 }
 
 function toggleHeading(block: NotionBlock): string {

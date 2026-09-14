@@ -7,7 +7,7 @@ import { hasLlmAuth, runTrendAgent } from './trend-llm-core';
 /** 오늘 수집본 → 웹 검색 파급 분석 (대시보드 전용, 수집 파이프라인과 분리) */
 export async function analyzeDailyTrend(daily: DailyReport): Promise<DailyTrendReport | null> {
   if (!hasLlmAuth()) {
-    console.warn('데일리 급등 LLM — CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY 없음, 건너뜀');
+    console.warn('데일리 급등 LLM — CLAUDE_CODE_OAUTH_TOKEN 없음, 건너뜀');
     return null;
   }
 
