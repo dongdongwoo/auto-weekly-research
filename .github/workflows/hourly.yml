@@ -78,5 +78,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/dashboard.snapshot.json
-          git diff --staged --quiet || git commit -m "chore: dashboard snapshot"
-          git push
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: dashboard snapshot"
+          fi
+          # 실행 중 원격 main 이 앞서면 push 거절됨 → rebase 후 재시도
+          for attempt in 1 2 3; do
+            git pull --rebase origin main
+            git push origin HEAD:main && exit 0
+            echo "push rejected, retry $attempt/3..."
+            sleep 5
+          done
+          exit 1
