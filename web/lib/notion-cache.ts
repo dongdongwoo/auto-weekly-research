@@ -10,6 +10,7 @@ const VERSION = 17;
 const CACHE_DIR = path.join(process.cwd(), '.cache');
 const CACHE_FILE = path.join(CACHE_DIR, 'dashboard.json');
 const SNAPSHOT_FILE = path.join(process.cwd(), 'public', 'dashboard.snapshot.json');
+const VERSION_FILE = path.join(process.cwd(), 'public', 'dashboard.version.json');
 const IS_DEV = process.env.NODE_ENV === 'development';
 const IS_VERCEL = !!process.env.VERCEL;
 
@@ -192,10 +193,14 @@ export function getCachedDashboardData(): Promise<DashboardData> {
   return inflight;
 }
 
-/** GHA export:dashboard — Notion 전체 → public/dashboard.snapshot.json */
+/** GHA export:dashboard — snapshot + 클라이언트 폴링용 version 파일 */
 export async function exportDashboardSnapshot(): Promise<DashboardData> {
   const data = await fetchDashboardData();
   await fs.mkdir(path.dirname(SNAPSHOT_FILE), { recursive: true });
   await fs.writeFile(SNAPSHOT_FILE, JSON.stringify(data));
+  await fs.writeFile(
+    VERSION_FILE,
+    JSON.stringify({ generatedAt: data.generatedAt, v: VERSION }),
+  );
   return data;
 }

@@ -133,18 +133,41 @@ export const DASH_JS = `(function () {
     }
   }
 
-  /** Notion 캐시 TTL 만료 시 페이지 새로고침 (GHA→Notion 갱신분 반영) */
-  function scheduleAutoReload() {
+  /** /dashboard.version.json 과 페이지 embedded 시각 비교 — 바뀐 경우만 reload */
+  function watchSnapshotVersion() {
     var shell = document.querySelector('.shell[data-generated-at]');
     if (!shell) return;
-    var generatedAt = Date.parse(shell.getAttribute('data-generated-at') || '');
-    var ttl = Number(shell.getAttribute('data-refresh-sec') || 1800) * 1000;
-    if (!generatedAt || !ttl) return;
-    var remaining = ttl - (Date.now() - generatedAt);
-    if (remaining < 5000) remaining = 5000;
-    setTimeout(function () {
-      location.reload();
-    }, remaining);
+    var pageAt = Date.parse(shell.getAttribute('data-generated-at') || '');
+    if (!pageAt || Number.isNaN(pageAt)) return;
+
+    var pollSec = Number(shell.getAttribute('data-poll-sec') || 300);
+    if (!pollSec || pollSec < 60) pollSec = 60;
+    var checking = false;
+
+    function check() {
+      if (checking || document.hidden) return;
+      checking = true;
+      fetch('/dashboard.version.json', { cache: 'no-store' })
+        .then(function (r) {
+          return r.ok ? r.json() : null;
+        })
+        .then(function (ver) {
+          if (!ver || !ver.generatedAt) return;
+          var remoteAt = Date.parse(ver.generatedAt);
+          if (!Number.isNaN(remoteAt) && remoteAt > pageAt + 1000) {
+            location.reload();
+          }
+        })
+        .catch(function () {})
+        .finally(function () {
+          checking = false;
+        });
+    }
+
+    setInterval(check, pollSec * 1000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) check();
+    });
   }
 
   function openTrendModal(id) {
@@ -244,7 +267,7 @@ export const DASH_JS = `(function () {
     applySearch();
     applySort();
     applyAxis();
-    scheduleAutoReload();
+    watchSnapshotVersion();
     bindMobileDetail();
     bindTrendModals();
   }

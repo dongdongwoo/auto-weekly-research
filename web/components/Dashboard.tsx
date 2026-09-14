@@ -98,11 +98,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
   ].join('');
 
   return (
-    <div
-      className="shell"
-      data-generated-at={data.generatedAt}
-      data-refresh-sec={process.env.NOTION_CACHE_SECONDS ?? '1800'}
-    >
+    <div className="shell" data-generated-at={data.generatedAt} data-poll-sec="300">
       <style>{css}</style>
       <input className="sr" type="radio" name="view" id="view-home" defaultChecked />
       <input className="sr" type="radio" name="view" id="view-daily" />

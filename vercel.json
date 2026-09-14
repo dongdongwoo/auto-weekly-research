@@ -3,5 +3,13 @@
   "framework": "nextjs",
   "buildCommand": "npm run build:web",
   "installCommand": "npm ci",
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "headers": [
+    {
+      "source": "/dashboard.version.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
+  ]
 }
