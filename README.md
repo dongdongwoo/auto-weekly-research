@@ -25,7 +25,7 @@ npm run hourly         # 시간별 자동 실행용
 
 ## 스케줄 (GitHub Actions = `npm run hourly`)
 
-매시 KST 정각. GitHub cron은 UTC `0 * * * *` 이라 KST도 매시 00분에 맞춰집니다. KST 00:00 = UTC 15:00.
+매시 KST 정각. **cron-job.org**가 GitHub `workflow_dispatch` API로 트리거 (GHA 내장 schedule은 사용 안 함 — 정각 보장·드롭 방지).
 
 | 시각 | 실행 |
 | ---- | ---- |

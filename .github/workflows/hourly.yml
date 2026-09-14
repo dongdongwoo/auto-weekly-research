@@ -1,11 +1,9 @@
 name: Research Pipeline
 
-# 매시: Notion 수집·분석 → dashboard.snapshot.json 커밋 → Vercel 자동 배포
-# Vercel은 Notion API 없이 public/dashboard.snapshot.json 만 읽음
+# cron-job.org → workflow_dispatch (매시 KST 정각)
+# Notion 수집·분석 → dashboard.snapshot.json 커밋 → Vercel 자동 배포
 
 on:
-  schedule:
-    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
       mode:
