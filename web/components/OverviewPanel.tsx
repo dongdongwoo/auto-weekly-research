@@ -1,6 +1,7 @@
 import type { DailyReport, WeeklyReport, WeeklyTrendReport } from '@/lib/types';
 import type { OverviewStats } from '@/lib/insights';
 import { DAILY_LLM_HINT, weeklyTrendHint } from '@/lib/trend-hints';
+import { formatLastUpdated, updatedTimeOnly } from '@/lib/format-updated';
 import { splitWeeklyBrief } from '@/lib/weekly-brief';
 import {
   ArticleTimeline,
@@ -12,13 +13,6 @@ import {
   TrendRankList,
 } from './OverviewCharts';
 import { TrendModals } from './TrendModals';
-
-function confidenceClass(raw: string) {
-  if (raw.startsWith('높음')) return 'high';
-  if (raw.startsWith('낮음')) return 'low';
-  if (raw.startsWith('중간')) return 'mid';
-  return 'mid';
-}
 
 export function OverviewPanel({
   weekly,
@@ -43,23 +37,27 @@ export function OverviewPanel({
     ? dailies.filter((d) => d.date === dailyTarget)
     : dailies.slice(0, 1);
   const weeklyBrief = splitWeeklyBrief(weekly);
+  const weeklyUpdated = formatLastUpdated(weekly?.updatedAt);
+  const weeklyTrendTime = updatedTimeOnly(weeklyTrend?.updatedAt);
+  const dailyTrendTime = updatedTimeOnly(stats.dailyTrend?.updatedAt);
   return (
     <div className="overview">
       <header className="overview-hero">
-        <div className="overview-hero-top">
-          <p className="overview-kicker">{weekly?.weekId ?? '—'} · 이번 주 브리프</p>
-          {weekly?.confidenceOverview ? (
-            <span className={`badge ${confidenceClass(weekly.confidenceOverview)}`}>
-              {weekly.confidenceOverview.split(/[—–-]/)[0].trim()}
-            </span>
-          ) : null}
-        </div>
+        <p className="overview-kicker">{weekly?.weekId ?? '—'} · 이번 주 브리프</p>
         <h2 className="overview-headline">
           {weeklyBrief.title || '주간 브리프가 생성되면 여기에 표시됩니다'}
         </h2>
-        {weeklyBrief.body ? <p className="overview-brief-body">{weeklyBrief.body}</p> : null}
+        {weeklyBrief.body ? (
+          <>
+            <input type="checkbox" id="brief-expand" className="sr" />
+            <p className="overview-brief-body">{weeklyBrief.body}</p>
+            <label htmlFor="brief-expand" className="overview-brief-toggle">
+              더 보기
+            </label>
+          </>
+        ) : null}
         <div className="overview-hero-links">
-          {weekly?.updatedAt ? <span className="overview-stamp">{weekly.updatedAt}</span> : null}
+          {weeklyUpdated ? <span className="overview-stamp">{weeklyUpdated}</span> : null}
           <label className="overview-link go-weekly-latest" htmlFor="view-weekly">
             주간 상세 →
           </label>
@@ -81,7 +79,7 @@ export function OverviewPanel({
             <h3 className="chart-title">주간 상위 언급 이슈</h3>
             <span className="chart-sub">
               최근 {stats.windowDays}일
-              {weeklyTrend?.updatedAt ? ` · ${weeklyTrend.updatedAt.split('·')[0]?.trim()}` : ''}
+              {weeklyTrendTime ? ` · ${weeklyTrendTime}` : ''}
             </span>
           </div>
           {weeklyTrend && weeklyTrend.items.length > 0 ? (
@@ -101,9 +99,7 @@ export function OverviewPanel({
             <h3 className="chart-title">데일리 급등 이슈</h3>
             <span className="chart-sub">
               오늘 {stats.dailyArticleCount}편
-              {stats.dailyTrend?.updatedAt
-                ? ` · ${stats.dailyTrend.updatedAt.split('·')[0]?.trim()}`
-                : ''}
+              {dailyTrendTime ? ` · ${dailyTrendTime}` : ''}
             </span>
           </div>
           {stats.dailyArticleCount === 0 ? (

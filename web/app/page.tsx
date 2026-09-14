@@ -2,6 +2,8 @@ import { getCachedDashboardData } from '@/lib/notion-cache';
 import { Dashboard } from '@/components/Dashboard';
 
 export const revalidate = 1800;
+/** Notion 전체 fetch — Vercel Pro 권장 (Hobby 10s 한도) */
+export const maxDuration = 60;
 
 export default async function HomePage({
   searchParams,

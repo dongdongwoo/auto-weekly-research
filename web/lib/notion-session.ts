@@ -7,8 +7,8 @@ type NotionBlock = {
   [key: string]: unknown;
 };
 
-const MIN_GAP_MS = Number(process.env.NOTION_MIN_GAP_MS ?? 400);
-const MAX_RETRIES = 8;
+const MIN_GAP_MS = Number(process.env.NOTION_MIN_GAP_MS ?? 500);
+const MAX_RETRIES = 5;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -46,8 +46,10 @@ export class NotionSession {
       return await fn();
     } catch (e) {
       if (isRateLimited(e) && attempt < MAX_RETRIES) {
-        const backoff = Math.min(30_000, 1500 * 2 ** attempt);
-        console.warn(`Notion rate limit — ${Math.round(backoff / 1000)}s 후 재시도 (${attempt + 1}/${MAX_RETRIES})`);
+        const backoff = Math.min(30_000, 2000 * 2 ** attempt);
+        console.warn(
+          `Notion rate limit — ${Math.round(backoff / 1000)}s 후 재시도 (${attempt + 1}/${MAX_RETRIES})`,
+        );
         await sleep(backoff);
         return this.call(fn, attempt + 1);
       }
@@ -88,6 +90,18 @@ export class NotionSession {
     this.blockCache.set(blockId, blocks);
     return blocks;
   }
+}
+
+let sharedSession: NotionSession | null = null;
+
+/** 프로세스 전역 단일 세션 — dev 동시 요청·HMR 시 throttle 공유 */
+export function getNotionSession(): NotionSession {
+  if (!sharedSession) {
+    const key = process.env.NOTION_API_KEY;
+    if (!key) throw new Error('NOTION_API_KEY must be set');
+    sharedSession = new NotionSession(new Client({ auth: key }));
+  }
+  return sharedSession;
 }
 
 export type { NotionBlock };

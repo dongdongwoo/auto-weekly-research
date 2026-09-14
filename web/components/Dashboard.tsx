@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { DashboardData, WeeklyReport, WeeklySignal } from '@/lib/types';
 import { buildOverviewStats } from '@/lib/insights';
+import { formatLastUpdated, updatedTimeOnly } from '@/lib/format-updated';
 import { splitWeeklyBrief } from '@/lib/weekly-brief';
 import { ArticleDetail, ArticleRow } from './ArticleCard';
 import { OverviewPanel } from './OverviewPanel';
@@ -62,6 +63,16 @@ function confidenceClass(raw: string) {
   return 'mid';
 }
 
+function DetailMobileBar({ label = '목록' }: { label?: string }) {
+  return (
+    <div className="detail-mobile-bar">
+      <button type="button" className="detail-back" data-detail-back>
+        ← {label}
+      </button>
+    </div>
+  );
+}
+
 export function Dashboard({
   data,
   initialQuery = '',
@@ -72,6 +83,7 @@ export function Dashboard({
   const articles = flattenArticles(data.dailies);
   const searching = initialQuery.trim().length > 0;
   const latest = data.weeklies[0] ?? null;
+  const lastUpdated = formatLastUpdated(latest?.updatedAt);
   const overviewStats = buildOverviewStats(articles, data.dailies, 7, data.dailyTrend);
 
   const css = [
@@ -114,15 +126,17 @@ export function Dashboard({
       ))}
 
       <header className="bar">
-        <label className="logo" htmlFor="view-home">
-          주간 인사이트
-        </label>
-        <nav className="nav">
+        <div className="bar-main">
+          <label className="logo" htmlFor="view-home">
+            주간 인사이트
+          </label>
+          {lastUpdated ? <p className="stamp stamp-header">{lastUpdated}</p> : null}
+        </div>
+        <nav className="nav" aria-label="보기 전환">
           <label htmlFor="view-home">대시보드</label>
           <label htmlFor="view-daily">데일리</label>
           <label htmlFor="view-weekly">주간</label>
         </nav>
-        {latest?.updatedAt ? <p className="stamp">{latest.updatedAt}</p> : null}
       </header>
 
       <div className="workspace">
@@ -205,6 +219,7 @@ export function Dashboard({
               <p className="empty search-empty">맞는 기사가 없습니다.</p>
             </aside>
             <main className="detail">
+              <DetailMobileBar label="기사 목록" />
               {articles.map((a) => (
                 <div
                   key={a.id}
@@ -256,7 +271,7 @@ function WeeklyPanel({ weeklies }: { weeklies: WeeklyReport[] }) {
                     id={`w-art-${sid(w.weekId)}`}
                     defaultChecked={i === 0}
                   />
-                  <div className="meta">{w.updatedAt || w.weekId}</div>
+                  <div className="meta">{updatedTimeOnly(w.updatedAt) ?? w.weekId}</div>
                   <div className="ttl">
                     {brief.title || w.issues[0]?.title || '주간 인사이트'}
                   </div>
@@ -274,6 +289,7 @@ function WeeklyPanel({ weeklies }: { weeklies: WeeklyReport[] }) {
           )}
         </aside>
         <main className="detail">
+          <DetailMobileBar label="주간 목록" />
           {weeklies.map((w) => (
             <div key={w.weekId} className="pane" id={`w-pane-${sid(w.weekId)}`} data-week-id={w.weekId}>
               <WeeklyDetail report={w} />
@@ -331,13 +347,14 @@ function Fold({
 
 function WeeklyDetail({ report }: { report: WeeklyReport }) {
   const brief = splitWeeklyBrief(report);
+  const lastUpdated = formatLastUpdated(report.updatedAt);
   return (
     <article>
       <p className="kicker">{report.weekId}</p>
       <h2>{brief.title || report.issues[0]?.title || '주간 브리프'}</h2>
       {brief.body ? <p className="weekly-brief-body">{brief.body}</p> : null}
       <div className="meta-row">
-        {report.updatedAt ? <span>{report.updatedAt}</span> : null}
+        {lastUpdated ? <span>{lastUpdated}</span> : null}
         {report.confidenceOverview ? (
           <span className={`badge ${confidenceClass(report.confidenceOverview)}`}>
             {report.confidenceOverview}

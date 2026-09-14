@@ -40,8 +40,8 @@ function TrendModal({
   dailyOnly?: boolean;
 }) {
   const related = dailyOnly ? [] : findRelatedArticles(dailies, item);
-  const extraSources = dailyOnly
-    ? []
+  const linkSources = dailyOnly
+    ? item.sources
     : related.length
       ? item.sources.filter(
           (s) => !related.some((a) => a.sources.some((as) => as.url === s.url)),
@@ -67,10 +67,12 @@ function TrendModal({
           {related.map((article) => (
             <TrendArticleBlock key={article.id} article={article} />
           ))}
-          {extraSources.length ? (
+          {linkSources.length ? (
             <div className="trend-dialog-refs">
-              <p className="trend-dialog-label">{related.length ? '추가 근거' : '근거'}</p>
-              <SourceLinks sources={extraSources} />
+              <p className="trend-dialog-label">
+                {dailyOnly ? '출처' : related.length ? '추가 근거' : '근거'}
+              </p>
+              <SourceLinks sources={linkSources} />
             </div>
           ) : null}
         </div>

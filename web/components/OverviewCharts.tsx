@@ -5,6 +5,7 @@ import type {
   TimelineItem,
   TrendingStory,
 } from '@/lib/insights';
+import { formatTrendUpdated } from '@/lib/format-updated';
 import type { DailyTrendItem } from '@/lib/types';
 
 function withAlpha(hex: string, alpha: number) {
@@ -74,10 +75,11 @@ export function TrendRankList({
   coverageOnly?: boolean;
 }) {
   if (items.length === 0) return null;
+  const trendUpdated = formatTrendUpdated(updatedAt);
 
   return (
     <div className="trending">
-      {updatedAt ? <p className="trend-updated">업데이트 · {updatedAt}</p> : null}
+      {trendUpdated ? <p className="trend-updated">{trendUpdated}</p> : null}
       {items.map((item, rank) => (
         <div
           key={item.id}

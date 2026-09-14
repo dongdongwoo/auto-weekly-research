@@ -1,5 +1,4 @@
-import { Client } from '@notionhq/client';
-import { NotionSession, type NotionBlock } from './notion-session';
+import { getNotionSession, type NotionBlock, type NotionSession } from './notion-session';
 import type {
   Article,
   DailyReport,
@@ -25,13 +24,11 @@ type NotionRichText = {
   annotations?: { bold?: boolean };
 };
 
-function getSession(): NotionSession {
-  const key = process.env.NOTION_API_KEY;
-  const pageId = process.env.NOTION_PAGE_ID;
-  if (!key || !pageId) {
+function getSession() {
+  if (!process.env.NOTION_API_KEY || !process.env.NOTION_PAGE_ID) {
     throw new Error('NOTION_API_KEY and NOTION_PAGE_ID must be set');
   }
-  return new NotionSession(new Client({ auth: key }));
+  return getNotionSession();
 }
 
 function hubPageId(): string {

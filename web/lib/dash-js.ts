@@ -150,6 +150,44 @@ export const DASH_JS = `(function () {
     if (dlg && typeof dlg.showModal === 'function') dlg.showModal();
   }
 
+  function isMobileDetail() {
+    return window.matchMedia('(max-width: 800px)').matches;
+  }
+
+  function shellEl() {
+    return document.querySelector('.shell');
+  }
+
+  function openMobileDetail() {
+    if (!isMobileDetail()) return;
+    var shell = shellEl();
+    if (shell) shell.classList.add('mobile-detail-open');
+  }
+
+  function closeMobileDetail() {
+    var shell = shellEl();
+    if (shell) shell.classList.remove('mobile-detail-open');
+  }
+
+  function bindMobileDetail() {
+    document.addEventListener('click', function (e) {
+      var row =
+        e.target.closest &&
+        e.target.closest('.panel-articles label.row, .panel-weekly label.row');
+      if (row && isMobileDetail()) openMobileDetail();
+    });
+
+    document.querySelectorAll('[data-detail-back]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        closeMobileDetail();
+      });
+    });
+
+    window.addEventListener('resize', function () {
+      if (!isMobileDetail()) closeMobileDetail();
+    });
+  }
+
   function bindTrendModals() {
     document.querySelectorAll('.trend-dialog').forEach(function (dlg) {
       dlg.addEventListener('click', function (e) {
@@ -181,6 +219,7 @@ export const DASH_JS = `(function () {
     applySort();
     applyAxis();
     scheduleAutoReload();
+    bindMobileDetail();
     bindTrendModals();
   }
 
@@ -196,6 +235,7 @@ export const DASH_JS = `(function () {
     if (t.getAttribute && t.getAttribute('data-sort') != null) applySort();
     if (t.getAttribute && t.getAttribute('data-axis-filter') != null) applyAxis();
     if (t.getAttribute && t.getAttribute('data-day') != null) applyDay(true);
+    if (t.name === 'view') closeMobileDetail();
     if (t.name === 'view' || t.name === 'daily-date') {
       requestAnimationFrame(function () {
         applyDay(false);
@@ -211,6 +251,7 @@ export const DASH_JS = `(function () {
       e.target.closest('.nav label, label.logo, .overview-link, .overview-nav-btn');
     if (!lab) return;
     clearSearchIfNeeded();
+    closeMobileDetail();
     if (lab.classList.contains('go-weekly-latest')) {
       requestAnimationFrame(function () {
         selectLatestWeekly();
