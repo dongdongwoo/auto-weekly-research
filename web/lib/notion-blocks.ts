@@ -43,9 +43,9 @@ function hubPageId(): string {
   return id;
 }
 
+/** GHA export 시 Notion에서 읽을 주간 페이지 수 (기본 4) */
 function maxWeeks(): number {
-  const fallback = process.env.VERCEL ? 2 : 4;
-  return Math.max(1, Number(process.env.NOTION_MAX_WEEKS ?? fallback));
+  return Math.max(1, Number(process.env.NOTION_MAX_WEEKS ?? 4));
 }
 
 function richTextToPlain(rich: NotionRichText[]): string {

@@ -12,12 +12,11 @@ export default async function HomePage() {
   try {
     data = await getCachedDashboardData();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Notion 데이터를 불러오지 못했습니다.';
-    if (msg.includes('rate_limited') || msg.includes('rate limited')) {
+    const msg = e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.';
+    if (msg.includes('dashboard.snapshot.json')) {
+      error = '대시보드 스냅샷이 아직 없습니다. GitHub Actions 파이프라인 실행 후 다시 열어 주세요.';
+    } else if (msg.includes('rate_limited') || msg.includes('rate limited')) {
       error = 'Notion 요청이 너무 많습니다. 2분 뒤 새로고침해 주세요.';
-    } else if (msg.includes('notion_fetch_timeout') || msg.includes('timeout')) {
-      error =
-        'Notion 응답이 느립니다. 1~2분 뒤 새로고침하거나, GHA가 생성한 스냅샷 배포를 확인해 주세요.';
     } else {
       error = '데이터를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
     }

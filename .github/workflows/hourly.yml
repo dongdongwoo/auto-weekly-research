@@ -1,10 +1,7 @@
 name: Research Pipeline
 
-# 스케줄 (모두 UTC)
-# · 매시 정각 — 증분 수집 + 트렌드 스냅샷 (KST 매시 00분)
-# · KST 09:00 = UTC 00:00 — 같은 실행에서 주간 인사이트도 갱신
-#
-# 수동 실행(workflow_dispatch)으로 mode 선택 가능
+# 매시: Notion 수집·분석 → dashboard.snapshot.json 커밋 → Vercel 자동 배포
+# Vercel은 Notion API 없이 public/dashboard.snapshot.json 만 읽음
 
 on:
   schedule:
@@ -21,6 +18,7 @@ on:
           - morning
           - weekly
           - trends
+          - export
 
 permissions:
   contents: write
@@ -53,6 +51,7 @@ jobs:
           fi
 
       - name: Run pipeline
+        if: steps.mode.outputs.value != 'export'
         run: |
           case "${{ steps.mode.outputs.value }}" in
             hourly)  npm run hourly ;;
@@ -67,15 +66,16 @@ jobs:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
 
-      - name: Export dashboard snapshot (Vercel fallback)
-        if: steps.mode.outputs.value == 'hourly' || steps.mode.outputs.value == 'morning'
+      - name: Export dashboard snapshot
+        if: steps.mode.outputs.value == 'hourly' || steps.mode.outputs.value == 'morning' || steps.mode.outputs.value == 'export'
         run: npm run export:dashboard
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+          NOTION_MAX_WEEKS: '4'
 
-      - name: Push snapshot for redeploy
-        if: steps.mode.outputs.value == 'hourly' || steps.mode.outputs.value == 'morning'
+      - name: Push snapshot
+        if: steps.mode.outputs.value == 'hourly' || steps.mode.outputs.value == 'morning' || steps.mode.outputs.value == 'export'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

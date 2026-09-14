@@ -79,20 +79,18 @@ npm run dev                  # http://localhost:3000
 **Vercel 배포** (저장소 **루트**에서 배포 — Root Directory 비워두거나 `.`)
 
 1. 배포 시간이 **2~3초**면 Next.js 빌드가 안 된 것. 정상은 **30초~1분+**
-2. **Environment Variables** (Production + Preview):
-   - `NOTION_API_KEY` — 필수
-   - `NOTION_PAGE_ID` — 필수
-   - `NOTION_MAX_WEEKS=3` — 선택 (첫 로딩·rate limit 완화)
-   - LLM·OAuth 토큰 **불필요** (수집·트렌드·주간 인사이트는 GitHub Actions 전용)
-3. **Redeploy** (Deployments → … → Redeploy)
+2. Vercel **환경 변수 불필요** — `public/dashboard.snapshot.json` 만 읽음 (GHA가 매시 커밋)
+3. LLM·Notion 키는 **GitHub Actions Secrets** 전용
 
-Notion 읽기 캐시 ISR 30분 (`revalidate = 1800`). 트렌드는 GHA가 Notion에 저장한 스냅샷을 그대로 표시합니다.
+데이터 흐름: GHA 매시 `collect → trends → export:dashboard → git push` → Vercel 자동 배포. ISR 30분 (`revalidate = 1800`).
 
 탭: **이번 주**(살아있는 인사이트) · **데일리** · **아카이브**(지난 주)
 
 ## 자동 실행
 
-**GitHub Actions** — Secrets 3개 (`CLAUDE_CODE_OAUTH_TOKEN`, `NOTION_API_KEY`, `NOTION_PAGE_ID`). 매시 `npm run hourly`.
+**GitHub Actions** — Secrets 3개 (`CLAUDE_CODE_OAUTH_TOKEN`, `NOTION_API_KEY`, `NOTION_PAGE_ID`). 매시 `npm run hourly` 후 `export:dashboard`로 스냅샷 커밋·푸시.
+
+로컬에서 스냅샷만 갱신: `npm run export:dashboard` (루트 `.env`의 Notion 키 사용)
 
 ## 파일 구조
 
