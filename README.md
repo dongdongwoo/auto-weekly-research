@@ -71,10 +71,9 @@ npm install
 npm run dev                  # http://localhost:3000
 ```
 
-**Vercel 배포** (모노레포 — **Root Directory `web` 필수**)
+**Vercel 배포** (저장소 **루트**에서 배포 — Root Directory 비워두거나 `.`)
 
-1. Vercel → 프로젝트 **Settings** → **Build and Deployment** → **Root Directory** → `web` 입력 → Save  
-   - 배포 시간이 **2~3초**면 빌드가 안 된 것 (Next.js 미실행). 정상은 **30초~1분+**
+1. 배포 시간이 **2~3초**면 Next.js 빌드가 안 된 것. 정상은 **30초~1분+**
 2. **Environment Variables** (Production + Preview):
    - `NOTION_API_KEY` — 필수
    - `NOTION_PAGE_ID` — 필수
