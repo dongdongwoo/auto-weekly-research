@@ -71,7 +71,18 @@ npm install
 npm run dev                  # http://localhost:3000
 ```
 
-**Vercel** — Root Directory = `web`, env `NOTION_API_KEY` / `NOTION_PAGE_ID`. ISR 10분.
+**Vercel 배포** (모노레포 — **Root Directory `web` 필수**)
+
+1. Vercel → 프로젝트 **Settings** → **Build and Deployment** → **Root Directory** → `web` 입력 → Save  
+   - 배포 시간이 **2~3초**면 빌드가 안 된 것 (Next.js 미실행). 정상은 **30초~1분+**
+2. **Environment Variables** (Production + Preview):
+   - `NOTION_API_KEY` — 필수
+   - `NOTION_PAGE_ID` — 필수
+   - `ANTHROPIC_API_KEY` — 선택 (데일리/주간 트렌드 LLM)
+   - `NOTION_MAX_WEEKS=3` — 선택 (첫 로딩·rate limit 완화)
+3. **Redeploy** (Deployments → … → Redeploy)
+
+캐시 ISR 30분 (`revalidate = 1800`).
 
 탭: **이번 주**(살아있는 인사이트) · **데일리** · **아카이브**(지난 주)
 
