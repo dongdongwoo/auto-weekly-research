@@ -66,7 +66,9 @@ jobs:
 
       - name: Export dashboard snapshot
         if: steps.mode.outputs.value == 'hourly' || steps.mode.outputs.value == 'morning' || steps.mode.outputs.value == 'export'
-        run: npm run export:dashboard
+        run: |
+          sleep 30
+          npm run export:dashboard
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}

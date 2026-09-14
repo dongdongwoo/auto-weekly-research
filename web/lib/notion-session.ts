@@ -25,7 +25,28 @@ function isRateLimited(e: unknown): boolean {
   );
 }
 
-/** 단일 fetch 사이클 동안 API 호출을 직렬화·캐시·429 재시도 */
+function httpStatus(e: unknown): number | null {
+  if (typeof e === 'object' && e !== null && 'status' in e) {
+    const status = (e as { status?: number }).status;
+    return typeof status === 'number' ? status : null;
+  }
+  return null;
+}
+
+/** 429 + Notion/Cloudflare 일시 장애 (502 등) */
+function isRetryableError(e: unknown): boolean {
+  if (isRateLimited(e)) return true;
+  const status = httpStatus(e);
+  return status === 408 || status === 502 || status === 503 || status === 504;
+}
+
+function retryReason(e: unknown): string {
+  if (isRateLimited(e)) return 'rate limit';
+  const status = httpStatus(e);
+  return status != null ? `HTTP ${status}` : 'transient';
+}
+
+/** 단일 fetch 사이클 동안 API 호출을 직렬화·캐시·429/5xx 재시도 */
 export class NotionSession {
   private lastReq = 0;
   private blockCache = new Map<string, NotionBlock[]>();
@@ -47,10 +68,10 @@ export class NotionSession {
     try {
       return await fn();
     } catch (e) {
-      if (isRateLimited(e) && attempt < MAX_RETRIES) {
+      if (isRetryableError(e) && attempt < MAX_RETRIES) {
         const backoff = Math.min(30_000, 2000 * 2 ** attempt);
         console.warn(
-          `Notion rate limit — ${Math.round(backoff / 1000)}s 후 재시도 (${attempt + 1}/${MAX_RETRIES})`,
+          `Notion ${retryReason(e)} — ${Math.round(backoff / 1000)}s 후 재시도 (${attempt + 1}/${MAX_RETRIES})`,
         );
         await sleep(backoff);
         return this.call(fn, attempt + 1);
