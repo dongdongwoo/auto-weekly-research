@@ -73,15 +73,8 @@ function DetailMobileBar({ label = '목록' }: { label?: string }) {
   );
 }
 
-export function Dashboard({
-  data,
-  initialQuery = '',
-}: {
-  data: DashboardData;
-  initialQuery?: string;
-}) {
+export function Dashboard({ data }: { data: DashboardData }) {
   const articles = flattenArticles(data.dailies);
-  const searching = initialQuery.trim().length > 0;
   const latest = data.weeklies[0] ?? null;
   const pipelineUpdated = formatPipelineUpdated(data);
   const overviewStats = buildOverviewStats(articles, data.dailies, 7, data.dailyTrend);
@@ -106,7 +99,7 @@ export function Dashboard({
 
   return (
     <div
-      className={`shell${searching ? ' is-searching' : ''}`}
+      className="shell"
       data-generated-at={data.generatedAt}
       data-refresh-sec={process.env.NOTION_CACHE_SECONDS ?? '1800'}
     >
@@ -146,7 +139,7 @@ export function Dashboard({
             type="search"
             data-q=""
             placeholder="제목, 요약, 이슈 검색"
-            defaultValue={initialQuery}
+            defaultValue=""
           />
           <select className="sort" data-sort="" defaultValue="new">
             <option value="new">최신순</option>

@@ -1,15 +1,10 @@
 import { getCachedDashboardData } from '@/lib/notion-cache';
 import { Dashboard } from '@/components/Dashboard';
 
+/** ISR — CDN 캐시 30분. searchParams 쓰면 동적 렌더링되어 매 방문마다 Notion fetch → 타임아웃 */
 export const revalidate = 1800;
-/** Notion 전체 fetch — Vercel Pro 권장 (Hobby 10s 한도) */
-export const maxDuration = 60;
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
+export default async function HomePage() {
   let data;
   let error: string | null = null;
 
@@ -28,12 +23,11 @@ export default async function HomePage({
       <main className="err">
         <div>
           <h1>잠시 뒤에 다시 열어 주세요</h1>
-          <p>{error}</p>
+          <p>{error ?? '데이터를 불러오지 못했습니다.'}</p>
         </div>
       </main>
     );
   }
 
-  const { q } = await searchParams;
-  return <Dashboard data={data} initialQuery={q ?? ''} />;
+  return <Dashboard data={data} />;
 }

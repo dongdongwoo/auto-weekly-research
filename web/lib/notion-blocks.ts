@@ -44,7 +44,8 @@ function hubPageId(): string {
 }
 
 function maxWeeks(): number {
-  return Math.max(1, Number(process.env.NOTION_MAX_WEEKS ?? 4));
+  const fallback = process.env.VERCEL ? 2 : 4;
+  return Math.max(1, Number(process.env.NOTION_MAX_WEEKS ?? fallback));
 }
 
 function richTextToPlain(rich: NotionRichText[]): string {

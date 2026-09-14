@@ -3,5 +3,8 @@
   "framework": "nextjs",
   "buildCommand": "npm run build:web",
   "installCommand": "npm ci",
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "env": {
+    "NOTION_MAX_WEEKS": "2"
+  }
 }

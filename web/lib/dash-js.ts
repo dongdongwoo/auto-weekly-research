@@ -227,7 +227,19 @@ export const DASH_JS = `(function () {
     });
   }
 
+  function initSearchFromUrl() {
+    var params = new URLSearchParams(location.search);
+    var q = params.get('q');
+    if (!q) return;
+    var input = document.querySelector('[data-q]');
+    if (!input) return;
+    input.value = q;
+    var shell = document.querySelector('.shell');
+    if (shell) shell.classList.add('is-searching');
+  }
+
   function boot() {
+    initSearchFromUrl();
     applyDay(false);
     applySearch();
     applySort();
