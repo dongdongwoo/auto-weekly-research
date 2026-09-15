@@ -241,7 +241,7 @@ function WeeklyPanel({ weeklies }: { weeklies: WeeklyReport[] }) {
       <div className="split">
         <aside className="list">
           {weeklies.length === 0 ? (
-            <div className="empty">주간 인사이트는 KST 09:00에 갱신됩니다.</div>
+            <div className="empty">주간 인사이트는 매주 월요일 KST 09:00에 지난주 일일을 종합해 생성됩니다.</div>
           ) : (
             <div className="rows" data-sort-list="">
               {weeklies.map((w, i) => {

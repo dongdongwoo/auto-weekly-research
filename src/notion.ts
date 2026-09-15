@@ -26,7 +26,7 @@ export async function createWeekPage(title: string): Promise<string> {
         object: 'block',
         type: 'callout',
         callout: {
-          rich_text: toRichText('**일일 리서치**는 KST 자정에 날짜 토글이 생기고, 1시간마다 오늘 분이 쌓입니다. **데일리/주간 급등**은 수집 직후 GHA에서 갱신하고, **주간 인사이트**는 KST 09:00에 갱신됩니다.') as any,
+          rich_text: toRichText('**일일 리서치**는 KST 자정에 날짜 토글이 생기고, 1시간마다 오늘 분이 쌓입니다. **데일리/주간 급등**은 수집 직후 GHA에서 갱신하고, **주간 인사이트**는 매주 월요일 KST 09:00에 **지난주(월~일)** 일일을 종합해 생성됩니다.') as any,
           icon: { type: 'emoji', emoji: '📌' },
         },
       } as any,

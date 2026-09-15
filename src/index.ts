@@ -21,6 +21,7 @@ import {
   kstHour,
   kstStamp,
   isoWeekId,
+  isMondayKst,
   weekNewsDates,
   lastWeekMondayIso,
 } from './kst.js';
@@ -164,7 +165,7 @@ async function runMonthly() {
   await appendDigest(config.notionPageId, `📚 ${iso} 월간 딥다이브`, content);
 }
 
-/** 1시간마다: 오늘(KST) 증분 수집 → 트렌드 스냅샷. 주간 인사이트는 KST 09:00만 */
+/** 1시간마다: 오늘(KST) 증분 수집 → 트렌드. 주간 인사이트는 월요일 KST 09:00만 */
 async function runHourly() {
   const stamp = kstStamp();
   const today = kstToday();
@@ -180,11 +181,15 @@ async function runHourly() {
   const added = await collectDaily(today.iso, today.human, 'incremental');
   await refreshTrendSnapshots(weekPageId, today.iso, { added, hour });
 
-  if (hour === 9) {
-    console.log('📊 KST 09:00 — 주간 인사이트 갱신');
-    await refreshWeekly(today.iso, added, true);
+  if (hour === 9 && isMondayKst()) {
+    const lastWeekAnchor = lastWeekMondayIso();
+    const lastWeekId = isoWeekId(lastWeekAnchor);
+    console.log(`📊 KST 월요일 09:00 — ${lastWeekId} 주간 인사이트 (지난주 월~일 종합)`);
+    await refreshWeekly(lastWeekAnchor, added, true);
+  } else if (hour === 9) {
+    console.log('⏭️ 주간 인사이트 — 월요일 KST 09:00에만 갱신');
   } else {
-    console.log(`⏭️ 주간 인사이트 — KST 09:00에만 갱신 (현재 ${hour}시)`);
+    console.log(`⏭️ 주간 인사이트 — 월요일 KST 09:00에만 갱신 (현재 ${hour}시)`);
   }
 }
 
