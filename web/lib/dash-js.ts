@@ -170,6 +170,25 @@ export const DASH_JS = `(function () {
     });
   }
 
+  function trackAnalytics(name, data) {
+    try {
+      if (window.__trackAnalytics) window.__trackAnalytics(name, data || undefined);
+    } catch (e) {}
+  }
+
+  function trackMainTab() {
+    var view = document.querySelector('input[name="view"]:checked');
+    if (!view || !view.id) return;
+    var tab = view.id.replace(/^view-/, '');
+    if (tab) trackAnalytics('tab-' + tab);
+  }
+
+  function trackDailyTab() {
+    var day = document.querySelector('input[name="daily-date"]:checked');
+    if (!day || !day.id) return;
+    trackAnalytics('daily-date', { date: day.id.replace(/^dd-/, '') });
+  }
+
   function openTrendModal(id) {
     var dlg = document.getElementById('trend-modal-' + id);
     if (dlg && typeof dlg.showModal === 'function') dlg.showModal();
@@ -270,6 +289,7 @@ export const DASH_JS = `(function () {
     watchSnapshotVersion();
     bindMobileDetail();
     bindTrendModals();
+    trackMainTab();
   }
 
   document.addEventListener('input', function (e) {
@@ -284,8 +304,13 @@ export const DASH_JS = `(function () {
     if (t.getAttribute && t.getAttribute('data-sort') != null) applySort();
     if (t.getAttribute && t.getAttribute('data-axis-filter') != null) applyAxis();
     if (t.getAttribute && t.getAttribute('data-day') != null) applyDay(true);
-    if (t.name === 'view') closeMobileDetail();
+    if (t.name === 'view') {
+      closeMobileDetail();
+      trackMainTab();
+    }
+    if (t.name === 'daily-date') trackDailyTab();
     if (t.name === 'weekly-art') {
+      trackAnalytics('weekly-report', { week: t.id ? t.id.replace(/^w-art-/, '') : '' });
       requestAnimationFrame(function () {
         scrollDetailToTop('.panel-weekly');
       });

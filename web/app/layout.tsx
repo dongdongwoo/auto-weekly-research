@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '@vercel/analytics/next';
+import { AnalyticsBridge } from '@/components/AnalyticsBridge';
 import { DASH_JS } from '@/lib/dash-js';
 import './globals.css';
 
@@ -25,7 +27,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <script dangerouslySetInnerHTML={{ __html: DASH_JS }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+        <AnalyticsBridge />
+      </body>
     </html>
   );
 }
