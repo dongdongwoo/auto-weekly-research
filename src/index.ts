@@ -29,6 +29,7 @@ import { readWeekDaily, readWeekInsight } from './notionRead.js';
 import { refreshTrendSnapshots } from './trends.js';
 import { ensureWeekPage } from './weekPage.js';
 import { loadKnownItems, stripDuplicates, formatKnownForPrompt, logKnownSummary } from './dedup.js';
+import { readDedupIndexFile } from './dedupIndex.js';
 import { normalizeDigestMarkdown } from './newsItems.js';
 import { ensureAuth, config } from './config.js';
 
@@ -79,8 +80,9 @@ async function collectDaily(
     `📰 수집 대상: ${newsHuman} (${newsIso}) ${mode === 'incremental' ? '증분' : '하루 전체'}`,
   );
 
+  const dedupFromIndex = !!(await readDedupIndexFile());
   const known = await loadKnownItems(newsIso, config.dedupLookbackDays, true);
-  logKnownSummary(known, newsIso);
+  logKnownSummary(known, newsIso, dedupFromIndex ? 'index' : 'notion');
 
   const prompt =
     mode === 'incremental'

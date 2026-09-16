@@ -2,6 +2,7 @@ import { extractLinks } from './links.js';
 import { fetchDailyLogsInRange, cutoffIso } from './notionRead.js';
 import { splitNewsItems, headlineFromItem, isPlaceholderItem } from './newsItems.js';
 import { addIsoDays } from './kst.js';
+import { readDedupIndexFile, knownItemsFromDedupIndex } from './dedupIndex.js';
 
 export type KnownItem = {
   date: string;
@@ -113,8 +114,14 @@ function isKnownBlock(block: string, known: KnownItem[]): boolean {
 export async function loadKnownItems(
   targetIso: string,
   lookbackDays: number,
-  includeTargetDate = false
+  includeTargetDate = false,
 ): Promise<KnownItem[]> {
+  const index = await readDedupIndexFile();
+  if (index) {
+    return knownItemsFromDedupIndex(index, targetIso, lookbackDays, includeTargetDate);
+  }
+
+  console.warn('⚠️ public/dedup-index.json 없음 — Notion에서 중복 목록 읽기 (느림·rate limit 주의)');
   const cutoff = cutoffIso(targetIso, lookbackDays);
   const beforeIso = includeTargetDate ? addIsoDays(targetIso, 1) : targetIso;
   const items: KnownItem[] = [];
@@ -278,9 +285,14 @@ export function formatKnownForPrompt(
   ].join('\n');
 }
 
-export function logKnownSummary(known: KnownItem[], todayIso?: string): void {
+export function logKnownSummary(
+  known: KnownItem[],
+  todayIso?: string,
+  source: 'index' | 'notion' = 'index',
+): void {
   const urls = new Set(known.map((k) => k.url).filter(Boolean));
   const today = todayIso ? known.filter((k) => k.date === todayIso).length : 0;
   const todayNote = todayIso ? `, 오늘 ${today}건` : '';
-  console.log(`📋 중복 체크 (Notion 최근 1달): ${known.length}건 (URL ${urls.size}개${todayNote})`);
+  const label = source === 'index' ? 'dedup-index' : 'Notion';
+  console.log(`📋 중복 체크 (${label} · 최근 1달): ${known.length}건 (URL ${urls.size}개${todayNote})`);
 }

@@ -1,3 +1,4 @@
+import { buildDedupIndexFromDailies, writeDedupIndexFile } from '../../src/dedupIndex.js';
 import { exportDashboardSnapshot } from '../lib/notion-cache.js';
 
 const MAX_ATTEMPTS = 3;
@@ -19,9 +20,11 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     }
 
     const data = await exportDashboardSnapshot();
+    await writeDedupIndexFile(buildDedupIndexFromDailies(data.dailies, data.generatedAt));
     console.log(
       `✅ public/dashboard.snapshot.json — ${data.stats.totalArticles}편 · 주간 ${data.weeklies.length} · 일일 ${data.dailies.length}`,
     );
+    console.log(`✅ public/dedup-index.json — 중복 체크용 ${data.stats.totalArticles}건`);
     process.exit(0);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

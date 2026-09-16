@@ -1,4 +1,3 @@
-import { Client } from '@notionhq/client';
 import { config } from './config.js';
 import {
   markdownToBlocks,
@@ -7,16 +6,15 @@ import {
   countBlocks,
   NOTION_CHILD_LIMIT,
 } from './markdown.js';
+import { getNotionSession } from './notionSession.js';
 
-const notion = new Client({ auth: config.notionApiKey });
-
-export { notion };
+const session = getNotionSession();
 
 const CHUNK = NOTION_CHILD_LIMIT;
 
 /** 부모 페이지(NOTION_PAGE_ID) 아래 주간 하위 페이지 생성 */
 export async function createWeekPage(title: string): Promise<string> {
-  const page = await notion.pages.create({
+  const page = await session.createPage({
     parent: { type: 'page_id', page_id: config.notionPageId },
     properties: {
       title: { title: [{ type: 'text', text: { content: title } }] },
@@ -48,9 +46,7 @@ export async function appendDigest(
   const children = markdownToBlocks(digestMarkdown);
   const first = children.slice(0, CHUNK);
 
-  const res = await notion.blocks.children.append({
-    block_id: pageId,
-    children: [
+  const res = await session.appendChildren(pageId, [
       {
         object: 'block',
         type: 'toggle',
@@ -59,17 +55,13 @@ export async function appendDigest(
           children: first as any,
         },
       } as any,
-    ],
-  });
+  ]);
 
   const rest = children.slice(CHUNK);
   if (rest.length > 0) {
     const toggleId = (res.results[0] as any).id as string;
     for (let i = 0; i < rest.length; i += CHUNK) {
-      await notion.blocks.children.append({
-        block_id: toggleId,
-        children: rest.slice(i, i + CHUNK) as any,
-      });
+      await session.appendChildren(toggleId, rest.slice(i, i + CHUNK) as any);
     }
   }
 
@@ -82,32 +74,19 @@ function richTextPlain(block: { type: string; [k: string]: unknown }): string {
 }
 
 async function listChildBlocks(blockId: string): Promise<{ id: string; type: string; [k: string]: unknown }[]> {
-  const blocks: { id: string; type: string; [k: string]: unknown }[] = [];
-  let cursor: string | undefined;
-  do {
-    const res = await notion.blocks.children.list({
-      block_id: blockId,
-      start_cursor: cursor,
-    });
-    blocks.push(...(res.results as { id: string; type: string }[]));
-    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
-  } while (cursor);
-  return blocks;
+  return session.getDirectBlocks(blockId);
 }
 
 async function appendChildren(blockId: string, children: NotionBlock[]): Promise<void> {
   for (let i = 0; i < children.length; i += CHUNK) {
-    await notion.blocks.children.append({
-      block_id: blockId,
-      children: children.slice(i, i + CHUNK) as any,
-    });
+    await session.appendChildren(blockId, children.slice(i, i + CHUNK) as any);
   }
 }
 
 async function replaceToggleChildren(toggleId: string, children: NotionBlock[]): Promise<void> {
   const existing = await listChildBlocks(toggleId);
   for (const block of existing) {
-    await notion.blocks.update({ block_id: block.id, archived: true });
+    await session.archiveBlock(block.id);
   }
   await appendChildren(toggleId, children);
 }
@@ -129,8 +108,7 @@ export async function upsertNamedToggle(
   }
 
   console.log(`📝 노션 토글 갱신: "${title}"`);
-  await notion.blocks.update({
-    block_id: existing.id,
+  await session.updateBlock(existing.id, {
     toggle: { rich_text: toRichText(`**${title}**`) as any },
   } as any);
   await replaceToggleChildren(existing.id, children);
@@ -207,7 +185,7 @@ export async function ensureDailyToggle(weekPageId: string, newsIso: string): Pr
 /** 연결 사전 점검 — NOTION_PAGE_ID = 주간 페이지들이 생성될 부모(허브) 페이지 */
 export async function checkConnection(): Promise<void> {
   try {
-    const page: any = await notion.pages.retrieve({ page_id: config.notionPageId });
+    const page: any = await session.retrievePage(config.notionPageId);
     const title =
       page.properties?.title?.title?.[0]?.plain_text ??
       Object.values<any>(page.properties ?? {}).find((p: any) => p.type === 'title')?.title?.[0]

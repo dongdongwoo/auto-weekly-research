@@ -1,6 +1,9 @@
 import { config } from './config.js';
-import { notion } from './notion.js';
+import { getNotionSession } from './notionSession.js';
 import { isoWeekId, weekNewsDates } from './kst.js';
+
+const session = getNotionSession();
+let hubPagesCache: HubChildPage[] | null = null;
 import { isProductName } from './prompt.js';
 
 type NotionRichText = {
@@ -37,19 +40,7 @@ function toggleTitle(block: NotionBlock): string {
 }
 
 async function fetchAllBlocks(blockId: string): Promise<NotionBlock[]> {
-  const blocks: NotionBlock[] = [];
-  let cursor: string | undefined;
-
-  do {
-    const res = await notion.blocks.children.list({
-      block_id: blockId,
-      start_cursor: cursor,
-    });
-    blocks.push(...(res.results as NotionBlock[]));
-    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
-  } while (cursor);
-
-  return blocks;
+  return session.getDirectBlocks(blockId);
 }
 
 async function blockToMarkdownLines(
@@ -155,14 +146,13 @@ export type HubChildPage = { id: string; title: string; weekId: string | null };
 
 /** 허브 페이지 아래 주간 하위 페이지 목록 */
 export async function listHubChildPages(): Promise<HubChildPage[]> {
+  if (hubPagesCache) return hubPagesCache;
+
   const pages: HubChildPage[] = [];
   let cursor: string | undefined;
 
   do {
-    const res = await notion.blocks.children.list({
-      block_id: config.notionPageId,
-      start_cursor: cursor,
-    });
+    const res = await session.listChildren(config.notionPageId, cursor);
 
     for (const block of res.results as NotionBlock[]) {
       if (block.type !== 'child_page') continue;
@@ -174,6 +164,7 @@ export async function listHubChildPages(): Promise<HubChildPage[]> {
     cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
   } while (cursor);
 
+  hubPagesCache = pages;
   return pages;
 }
 
