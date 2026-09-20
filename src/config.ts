@@ -36,7 +36,7 @@ export function warnIfAuthConflict(): void {
 export const config = {
   notionApiKey: required('NOTION_API_KEY'),
   notionPageId: required('NOTION_PAGE_ID'),
-  model: process.env.CLAUDE_MODEL ?? 'claude-fable-5',
+  model: process.env.CLAUDE_MODEL ?? 'claude-opus-4-6',
   /** 컨텍스트만 (주간 초안 등) */
   maxTurns: Number(process.env.MAX_TURNS ?? 25),
   /** 웹 검색 수집·검증 — 턴 소진이 잦아 기본값을 높게 */

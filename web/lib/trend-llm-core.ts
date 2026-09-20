@@ -22,7 +22,7 @@ export function hasLlmAuth(): boolean {
 export async function runTrendAgent(prompt: string): Promise<string> {
   const webSearch = !isServerless();
   const fullPrompt = webSearch ? prompt : prompt + SERVERLESS_APPEND;
-  const model = process.env.CLAUDE_MODEL ?? 'claude-fable-5';
+  const model = process.env.CLAUDE_MODEL ?? 'claude-opus-4-6';
   const maxTurns = Number(
     process.env.MAX_TURNS ?? (webSearch ? 30 : 8),
   );
