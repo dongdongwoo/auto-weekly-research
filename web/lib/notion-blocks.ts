@@ -43,9 +43,21 @@ function hubPageId(): string {
   return id;
 }
 
-/** GHA export 시 Notion에서 읽을 주간 페이지 수 (기본 4) */
+/** GHA export 시 Notion에서 읽을 고유 주간 페이지 수 (기본 8) */
 function maxWeeks(): number {
-  return Math.max(1, Number(process.env.NOTION_MAX_WEEKS ?? 4));
+  return Math.max(1, Number(process.env.NOTION_MAX_WEEKS ?? 8));
+}
+
+/** 동일 weekId 중복 페이지(레이스로 2개 생긴 경우) — 최신 정렬 후 첫 항목만 */
+function dedupeWeeks(weeks: WeekPage[]): WeekPage[] {
+  const seen = new Set<string>();
+  const out: WeekPage[] = [];
+  for (const w of weeks) {
+    if (seen.has(w.weekId)) continue;
+    seen.add(w.weekId);
+    out.push(w);
+  }
+  return out;
 }
 
 function richTextToPlain(rich: NotionRichText[]): string {
@@ -582,7 +594,8 @@ export async function fetchDashboardData(
   } while (cursor);
 
   weeks.sort((a, b) => b.weekId.localeCompare(a.weekId));
-  const weeksToLoad = weeks.slice(0, weekLimit);
+  const uniqueWeeks = dedupeWeeks(weeks);
+  const weeksToLoad = uniqueWeeks.slice(0, weekLimit);
 
   const dailies: DailyReport[] = [];
   const weeklies: WeeklyReport[] = [];
@@ -667,7 +680,7 @@ export async function fetchDashboardData(
   return {
     hubTitle,
     generatedAt: new Date().toISOString(),
-    weeks,
+    weeks: uniqueWeeks,
     dailies,
     weeklies,
     dailyTrend,

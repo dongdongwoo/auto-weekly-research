@@ -74,7 +74,7 @@ jobs:
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
-          NOTION_MAX_WEEKS: '4'
+          NOTION_MAX_WEEKS: '8'
           NOTION_MIN_GAP_MS: '900'
           NOTION_MAX_RETRIES: '8'
 
