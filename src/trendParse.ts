@@ -27,6 +27,10 @@ function parseLabeledLine(text: string): { label: string; body: string } | null 
   return null;
 }
 
+function stripTrendRankPrefix(title: string): string {
+  return title.replace(/^\d{1,2}\s*[·•.\-–—:)]\s*/, '').trim();
+}
+
 function parseSourcesFromText(text: string): TrendSourceLink[] {
   const links: TrendSourceLink[] = [];
   const re = /\[([^\]]+)\]\((https?:[^)]+)\)/g;
@@ -71,7 +75,7 @@ export function parseTrendMarkdown(markdown: string, idPrefix = 'dt'): TrendRepo
     );
     items.push({
       id: `${idPrefix}-${itemIdx++}`,
-      headline: currentItem.title,
+      headline: stripTrendRankPrefix(currentItem.title),
       score: compositeScore(coverageCount, mentionCount, rising),
       coverageCount,
       mentionCount,
@@ -114,7 +118,9 @@ export function parseTrendMarkdown(markdown: string, idPrefix = 'dt'): TrendRepo
         detectSection(title);
         return;
       }
-      if (section === 'trending' && title && !/^급등/.test(title)) startItem(title);
+      if (section === 'trending' && title && !/^급등/.test(title)) {
+        startItem(stripTrendRankPrefix(title));
+      }
       return;
     }
 

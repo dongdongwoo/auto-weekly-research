@@ -11,6 +11,11 @@ function parseLabeledLine(text: string): { label: string; body: string } | null 
   return null;
 }
 
+/** LLM이 ### 1 · 제목 형태로 순번을 붙이는 경우 — UI trend-rank 와 중복 */
+function stripTrendRankPrefix(title: string): string {
+  return title.replace(/^\d{1,2}\s*[·•.\-–—:)]\s*/, '').trim();
+}
+
 function parseSourcesFromText(text: string): SourceLink[] {
   const links: SourceLink[] = [];
   const re = /\[([^\]]+)\]\((https?:[^)]+)\)/g;
@@ -58,7 +63,7 @@ export function parseTrendMarkdown(
     );
     items.push({
       id: `${idPrefix}-${itemIdx++}`,
-      headline: currentItem.title,
+      headline: stripTrendRankPrefix(currentItem.title),
       score: compositeScore(coverageCount, mentionCount, rising),
       coverageCount,
       mentionCount,
@@ -101,7 +106,9 @@ export function parseTrendMarkdown(
         detectSection(title);
         return;
       }
-      if (section === 'trending' && title && !/^급등/.test(title)) startItem(title);
+      if (section === 'trending' && title && !/^급등/.test(title)) {
+        startItem(stripTrendRankPrefix(title));
+      }
       return;
     }
 
