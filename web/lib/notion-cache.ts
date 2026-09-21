@@ -47,15 +47,47 @@ function snapshotAgeMs(data: DashboardData): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-async function readPublicSnapshot(): Promise<DashboardData | null> {
+function parseSnapshotJson(raw: string): DashboardData | null {
   try {
-    const raw = await fs.readFile(SNAPSHOT_FILE, 'utf8');
     const parsed = JSON.parse(raw) as DashboardData;
     if (!parsed.dailies || !parsed.weeklies) return null;
     return parsed;
   } catch {
     return null;
   }
+}
+
+async function readPublicSnapshotFromDisk(): Promise<DashboardData | null> {
+  try {
+    const raw = await fs.readFile(SNAPSHOT_FILE, 'utf8');
+    return parseSnapshotJson(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** ISR 서버리스 번들에 public/ 이 없을 때 — CDN 정적 URL로 읽기 */
+async function readPublicSnapshotFromCdn(): Promise<DashboardData | null> {
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
+    process.env.VERCEL_URL?.trim();
+  if (!host) return null;
+
+  const base = host.startsWith('http') ? host : `https://${host}`;
+  try {
+    const res = await fetch(`${base}/dashboard.snapshot.json`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return parseSnapshotJson(await res.text());
+  } catch {
+    return null;
+  }
+}
+
+async function readPublicSnapshot(): Promise<DashboardData | null> {
+  const fromDisk = await readPublicSnapshotFromDisk();
+  if (fromDisk) return fromDisk;
+  if (IS_VERCEL) return readPublicSnapshotFromCdn();
+  return null;
 }
 
 async function readDisk(): Promise<CacheEntry | null> {
