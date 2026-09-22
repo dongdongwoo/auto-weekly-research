@@ -103,11 +103,12 @@ export const DASH_JS = `(function () {
       if (list.getClientRects().length === 0) return;
       var rows = [].slice.call(list.querySelectorAll('label.row'));
       var shown = rows.filter(visible);
-      var ok = shown.some(function (r) {
+      var checkedRow = rows.find(function (r) {
         var inp = r.querySelector('input[type="radio"]');
         return inp && inp.checked;
       });
-      if (!ok && shown[0]) {
+      var checkedVisible = checkedRow && shown.indexOf(checkedRow) !== -1;
+      if (!checkedVisible && shown[0]) {
         var inp = shown[0].querySelector('input[type="radio"]');
         if (inp) inp.checked = true;
       }

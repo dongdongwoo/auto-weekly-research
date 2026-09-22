@@ -555,6 +555,71 @@ async function parseTrendToggle(
   return parsed;
 }
 
+function buildDailySearchText(
+  date: string,
+  weekId: string,
+  axes: DailyReport['axes'],
+): string {
+  return [
+    date,
+    weekId,
+    ...axes.flatMap((a) => [
+      a.name,
+      ...a.articles.flatMap((art) => [
+        art.headline,
+        art.summary,
+        art.analysis,
+        ...art.sources.map((s) => s.label),
+      ]),
+    ]),
+  ]
+    .join(' ')
+    .toLocaleLowerCase();
+}
+
+/** 같은 KST 날짜 토글이 여러 번 export되면 기사 id(2026-09-22-0)가 겹쳐 패널이 2개씩 보임 */
+function mergeDailiesByDate(dailies: DailyReport[]): DailyReport[] {
+  const byDate = new Map<string, DailyReport>();
+
+  for (const daily of dailies) {
+    const existing = byDate.get(daily.date);
+    if (!existing) {
+      byDate.set(daily.date, daily);
+      continue;
+    }
+
+    for (const axis of daily.axes) {
+      const match = existing.axes.find((a) => a.name === axis.name);
+      if (match) match.articles.push(...axis.articles);
+      else existing.axes.push({ name: axis.name, articles: [...axis.articles] });
+    }
+    if (daily.weekId > existing.weekId) {
+      existing.weekId = daily.weekId;
+      existing.weekTitle = daily.weekTitle;
+    }
+  }
+
+  return [...byDate.values()]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((daily) => {
+      let idx = 0;
+      const axes = daily.axes.map((axis) => ({
+        name: axis.name,
+        articles: axis.articles.map((art) => ({
+          ...art,
+          id: `${daily.date}-${idx++}`,
+        })),
+      }));
+      const articleCount = idx;
+      return {
+        ...daily,
+        axes,
+        articleCount,
+        searchText: buildDailySearchText(daily.date, daily.weekId, axes),
+      };
+    });
+}
+
 export type FetchDashboardOptions = {
   maxWeeks?: number;
 };
@@ -597,7 +662,7 @@ export async function fetchDashboardData(
   const uniqueWeeks = dedupeWeeks(weeks);
   const weeksToLoad = uniqueWeeks.slice(0, weekLimit);
 
-  const dailies: DailyReport[] = [];
+  let dailies: DailyReport[] = [];
   const weeklies: WeeklyReport[] = [];
   let dailyTrend: DailyTrendReport | null = null;
   let weeklyTrend: WeeklyTrendReport | null = null;
@@ -668,7 +733,7 @@ export async function fetchDashboardData(
     }
   }
 
-  dailies.sort((a, b) => b.date.localeCompare(a.date));
+  dailies = mergeDailiesByDate(dailies);
   weeklies.sort((a, b) => b.weekId.localeCompare(a.weekId));
 
   if (dailyTrend && !dailyTrend.targetDate && dailies[0]) {
