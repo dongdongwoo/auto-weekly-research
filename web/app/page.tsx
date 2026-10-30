@@ -1,5 +1,6 @@
 import { getCachedDashboardData } from '@/lib/notion-cache';
 import { Dashboard } from '@/components/Dashboard';
+import { DashboardRecovery } from '@/components/DashboardRecovery';
 
 /** ISR — CDN 캐시 30분 */
 export const revalidate = 1800;
@@ -23,14 +24,7 @@ export default async function HomePage() {
   }
 
   if (error || !data) {
-    return (
-      <main className="err">
-        <div>
-          <h1>잠시 뒤에 다시 열어 주세요</h1>
-          <p>{error ?? '데이터를 불러오지 못했습니다.'}</p>
-        </div>
-      </main>
-    );
+    return <DashboardRecovery initialError={error} />;
   }
 
   return <Dashboard data={data} />;

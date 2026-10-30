@@ -1,7 +1,9 @@
 import './load-env';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { headers } from 'next/headers';
 import { fetchDashboardData } from './notion-blocks';
+import { parseSnapshotJson } from './snapshot-parse';
 import type { DashboardData } from './types';
 
 const TTL_MS = Number(process.env.NOTION_CACHE_SECONDS ?? 1800) * 1000;
@@ -13,6 +15,8 @@ const SNAPSHOT_FILE = path.join(process.cwd(), 'public', 'dashboard.snapshot.jso
 const VERSION_FILE = path.join(process.cwd(), 'public', 'dashboard.version.json');
 const IS_DEV = process.env.NODE_ENV === 'development';
 const IS_VERCEL = !!process.env.VERCEL;
+/** dev 기본: GHA 스냅샷 (Notion live는 NOTION_LIVE=1 일 때만) */
+const NOTION_LIVE_DEV = process.env.NOTION_LIVE === '1';
 
 type CacheEntry = {
   data: DashboardData;
@@ -47,11 +51,19 @@ function snapshotAgeMs(data: DashboardData): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-function parseSnapshotJson(raw: string): DashboardData | null {
+function normalizeSiteBase(host: string): string {
+  const trimmed = host.trim();
+  if (trimmed.startsWith('http')) return trimmed.replace(/\/$/, '');
+  return `https://${trimmed.replace(/\/$/, '')}`;
+}
+
+async function fetchSnapshotFromBase(base: string): Promise<DashboardData | null> {
   try {
-    const parsed = JSON.parse(raw) as DashboardData;
-    if (!parsed.dailies || !parsed.weeklies) return null;
-    return parsed;
+    const res = await fetch(`${normalizeSiteBase(base)}/dashboard.snapshot.json`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    return parseSnapshotJson(await res.text());
   } catch {
     return null;
   }
@@ -66,21 +78,36 @@ async function readPublicSnapshotFromDisk(): Promise<DashboardData | null> {
   }
 }
 
-/** ISR 서버리스 번들에 public/ 이 없을 때 — CDN 정적 URL로 읽기 */
+/** ISR 서버리스 번들에 public/ 이 없을 때 — 요청 호스트·CDN URL로 읽기 */
 async function readPublicSnapshotFromCdn(): Promise<DashboardData | null> {
-  const host =
-    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
-    process.env.VERCEL_URL?.trim();
-  if (!host) return null;
+  const bases: string[] = [];
 
-  const base = host.startsWith('http') ? host : `https://${host}`;
   try {
-    const res = await fetch(`${base}/dashboard.snapshot.json`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    return parseSnapshotJson(await res.text());
+    const h = await headers();
+    const host = h.get('x-forwarded-host') ?? h.get('host');
+    const proto = h.get('x-forwarded-proto') ?? 'https';
+    if (host) bases.push(`${proto}://${host}`);
   } catch {
-    return null;
+    /* build time 등 headers 없음 */
   }
+
+  for (const raw of [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.VERCEL_URL,
+  ]) {
+    if (raw?.trim()) bases.push(raw.trim());
+  }
+
+  const seen = new Set<string>();
+  for (const base of bases) {
+    const key = normalizeSiteBase(base);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const data = await fetchSnapshotFromBase(key);
+    if (data) return data;
+  }
+  return null;
 }
 
 async function readPublicSnapshot(): Promise<DashboardData | null> {
@@ -137,15 +164,20 @@ async function loadDashboardProduction(): Promise<DashboardData> {
   if (cached && isFresh(cached)) return cached.data;
 
   const snapshot = await readPublicSnapshot();
-  if (!snapshot) {
-    throw new Error(
-      'dashboard.snapshot.json 이 없습니다. GHA 파이프라인(export) 실행 후 배포하세요.',
-    );
+  if (snapshot) {
+    const entry = entryFromSnapshot(snapshot);
+    cached = entry;
+    return snapshot;
   }
 
-  const entry = entryFromSnapshot(snapshot);
-  cached = entry;
-  return snapshot;
+  if (cached?.data && cached.v === VERSION) {
+    console.warn('snapshot unavailable — serving last successful in-memory dashboard');
+    return cached.data;
+  }
+
+  throw new Error(
+    'dashboard.snapshot.json 이 없습니다. GHA 파이프라인(export) 실행 후 배포하세요.',
+  );
 }
 
 async function buildFromNotion(): Promise<DashboardData> {
@@ -158,6 +190,15 @@ async function buildFromNotion(): Promise<DashboardData> {
 }
 
 async function loadDashboardDev(): Promise<DashboardData> {
+  if (!NOTION_LIVE_DEV) {
+    const snapshot = await readPublicSnapshot();
+    if (snapshot) {
+      const entry = entryFromSnapshot(snapshot);
+      cached = entry;
+      return snapshot;
+    }
+  }
+
   const disk = await readDisk();
   if (disk && isFresh(disk)) {
     cached = disk;
@@ -193,14 +234,17 @@ async function loadDashboardDev(): Promise<DashboardData> {
   try {
     return await buildFromNotion();
   } catch (e) {
-    if (isRateLimited(e)) {
+    const rateLimited =
+      isRateLimited(e) ||
+      (e instanceof Error && /rate.?limit/i.test(e.message));
+    if (rateLimited) {
       rateLimitedUntil = Date.now() + 90_000;
       if (cached?.v === VERSION) return useStale('rate limit', cached);
       if (staleDisk) return useStale('rate limit', staleDisk);
     }
     const snapshot = await readPublicSnapshot();
     if (snapshot) {
-      console.warn('Notion 실패 — 로컬 public/dashboard.snapshot.json 사용');
+      console.warn('Notion 실패 — public/dashboard.snapshot.json 사용');
       return entryFromSnapshot(snapshot).data;
     }
     throw e;
